@@ -47,6 +47,9 @@ the repetition away:
 - **Friend-finder apps** start from profiles and personality quizzes. They are a dating-app shape
   applied to friendship, and they make you pick people before you have played with them.
 
+In Ceryce's words: *"We should build a dating service for friends, except they already exist and people
+like me still aren't on them 😆 the most effective one so far wasn't even designed to be one, Discord."*
+
 What actually works is the thing Discord communities stumble into by accident. A small group that
 already plays together needs one or two more people. A stranger fills the gap, gets on with them,
 keeps showing up and becomes part of the group. Ceryce put it this way (Ruling 2): *"You don't make
