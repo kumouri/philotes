@@ -432,6 +432,26 @@ games, one region. Prefer **co-op PvE games with 4-player lobbies** and no skill
 sessions are sociable and voice is common: the "4-player co-op" genre. Small lobbies need less
 density and resist lockout (§8), and skill doesn't have to be matched.
 
+**Candidate launch niche: async Archipelago multiworlds** (added 2026-09-24; Ceryce: *"definitely add it
+as a candidate launch niche. I wasn't even thinking async archipelago, but that's genius."*).
+[Archipelago](https://archipelago.gg/faq/en/) is a cross-game randomizer that builds one shared
+multiworld from each player's own game, described by a YAML file, and supports **async** play, where
+players connect at their own pace. As of 2026-09-24 a quick search found no automatic matcher or
+seed-maker: groups form by hand in the Archipelago Discord or interest threads, and one person
+collects YAMLs and generates the seed. Why it fits:
+
+- **Async removes the concurrency requirement** that drives §9.1. Players only need to join the
+  same seed, not be online at the same minute, so the density needed collapses from "queued now" to
+  "interested this week".
+- **The matcher can also be the maker.** It groups compatible requests (desired player count, pace,
+  goal length, sync vs async), collects the YAMLs, generates the seed and hands out the room. That
+  removes the organiser work that currently gates who gets to play.
+- **Rematch maps onto "the next seed".** "Match me with these people again" (R2) becomes "put us in
+  the same next multiworld", which is the same thing as the group-looking-for-one-or-two shape of R2.
+- **Caveats to check:** Archipelago's own licence and generation API, server hosting costs for
+  long-running async rooms, per-game setup friction, and whether §8's lockout arithmetic behaves
+  differently when the "pool" is a weekly sign-up window instead of a live queue.
+
 ### 9.3 MVP shape: Discord-bot-first, evaluated
 
 | Option | Density | Build cost | Hand-off | Risk |
