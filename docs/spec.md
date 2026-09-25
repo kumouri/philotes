@@ -341,3 +341,115 @@ The risk (R5): `b` works out that `a` avoided them.
 - **Honest limit.** In a tiny pool, such as a niche game where the same six people are always
   online, no amount of noise hides a consistent absence. R5 accepts this. The spec does not claim
   otherwise.
+
+## 8. Weaponized avoidance: the lockout arithmetic
+
+This section works through R8. Take one game's compatible pool at one moment:
+
+- `N` = players in an open window who could be in a lobby with target `P` (P included).
+- `L` = lobby size.
+- `A` = players in that pool whose avoid on `P` the matcher is currently honouring.
+
+`P` can only be placed if at least `L − 1` non-avoiders are available: `N − 1 − A ≥ L − 1`, or
+**`A ≤ N − L`**. Lockout therefore needs **`A ≥ N − L + 1`** simultaneous, *queued* avoiders.
+
+Expressed as the share of the *other queued players* who must be avoiding `P`:
+
+| `N` queued | `L` = 5 | `L` = 4 | `L` = 3 |
+|---:|---:|---:|---:|
+| 6 | 2 of 5 (40%) | 3 of 5 (60%) | 4 of 5 (80%) |
+| 8 | **4 of 7 (57%)** | 5 of 7 (71%) | 6 of 7 (86%) |
+| 10 | 6 of 9 (67%) | 7 of 9 (78%) | 8 of 9 (89%) |
+| 20 | 16 of 19 (84%) | 17 of 19 (89%) | 18 of 19 (95%) |
+| 50 | 46 of 49 (94%) | 47 of 49 (96%) | 48 of 49 (98%) |
+
+What follows from the table:
+
+1. **Ceryce's point holds at scale.** With a healthy pool, lockout needs almost everyone queued to
+   be avoiding one person.
+2. **Margo's counterpoint holds off-peak.** When `N` is close to `L`, a handful of online avoiders
+   is enough. The 8-queued / lobby-of-5 example needs only 4. Niche games and 3 a.m. live near the
+   top rows of the table.
+3. **Smaller lobbies and flexible size ranges resist lockout.** Letting players accept "3–5"
+   instead of exactly 5 is one of the strongest anti-lockout levers available. This is a reason to
+   encourage size *ranges* in the UI.
+4. **Soft avoids cannot lock anyone out indefinitely.** The relaxation ladder (§7.5) breaks soft
+   avoids once wait-time priority is high enough, so a mass *soft* avoid delays `P` and nothing
+   more. Only **hard** blocks can lock someone out. Hard blocks are capped (lean: 5 per player), so
+   a lockout needs `N − L + 1` distinct people to each spend a scarce slot on `P` and be queued at
+   the same moment.
+
+**Who pays for an avoid?** Lean (derived from the "an avoid only affects the avoider's matches"
+principle): when the matcher must choose between making the avoider wait and making the avoided
+player wait, and wait priorities are equal, **the avoider waits**. An avoid is a request, and the
+avoider pays for it in their own queue time. When a soft avoid has to break, the matcher breaks the
+most-decayed, lowest-weight one first.
+
+**Mass avoidance as a signal** (Proposed, Margo). If many people avoid someone, that goes to
+**human review only when it comes with actual reports**. It is never an automatic verdict, never a
+hidden score, and never a matching penalty applied to `P` globally. Lean: adopt. Lean addition:
+detect **coordinated hard-blocking**, where several accounts that often queue together hard-block
+the same target within a short window. Send that to review too, because in that case the likely
+bad actor is the group, not the target.
+
+**Unsolved, stated plainly:** a determined clique in a niche game with a thin pool can still lock
+someone out at specific hours using hard blocks. We can detect it and review it. We can't make it
+arithmetically impossible without weakening hard blocks, and hard blocks exist for real safety
+reasons. Phase 0 measures how often this happens at realistic sizes.
+
+## 9. Density and launch strategy
+
+R3 is the primary risk. The core feature (R2) needs *two specific people* to be in windows at the
+same time, which is harder than filling any lobby.
+
+### 9.1 Back-of-envelope concurrency
+
+These are assumptions to be replaced by Phase 0 output. Let `M` be opted-in players for one game in
+one region, `h` the hours per week each has an open window, and `f` the peak-to-average factor
+(evenings, weekends).
+
+Peak concurrency ≈ `f · M · h / 168`. For lobbies of 5 with real *choice* (lean target: ≥ 3L = 15
+concurrent at peak):
+
+| Window habit | `h` | `f` | `M` needed |
+|---|---:|---:|---:|
+| Live queue only ("I'm on now") | 2 | 2.5 | ~500 |
+| Availability windows ("ping me in the next few hours", a few times a week) | 6 | 2.5 | ~170 |
+| Generous windows | 10 | 2.5 | ~100 |
+
+**Availability windows cut the required community size by roughly 3×**, which is why the model
+uses windows (§6) rather than only a live lobby wait. A window is still not a scheduled group:
+nobody commits to anyone, and it only says when *you* are free. Rematch rates for specific pairs
+are what R2 depends on, and they are harder to estimate on paper. Phase 0 measures them directly.
+
+### 9.2 Start narrow
+
+The engine is game-agnostic (R1). **The launch should not be.** Lean: one existing community, 1–3
+games, one region. Prefer **co-op PvE games with 4-player lobbies** and no skill balancing, where
+sessions are sociable and voice is common: the "4-player co-op" genre. Small lobbies need less
+density and resist lockout (§8), and skill doesn't have to be matched.
+
+### 9.3 MVP shape: Discord-bot-first, evaluated
+
+| Option | Density | Build cost | Hand-off | Risk |
+|---|---|---|---|---|
+| **A. Discord bot inside one existing community** (lean) | Borrows the community's existing density and trust. Cold start is "a server's members opt in", not "strangers find an app". | Low: slash commands, DMs, temp channels. No accounts, no voice infra. | Trivial: the bot creates a private temp voice and text channel for the lobby. | Discord dependency and policy. Bot DMs can be disabled by users. Density is capped at one server. |
+| B. Standalone web or mobile app | Worst cold start: an empty room. | High: accounts, notifications, a hand-off path, T&S tooling. | Hard: needs in-game handle exchange. | Everything in R3. |
+| C. Cross-server Discord network (like LFG Hub's network) | Best long-term density. | Medium (on top of A). | Same as A, across servers. | Moderation across communities with different norms. |
+| D. Contribute to an existing OSS LFG bot | Inherits its installs. | Unknown; depends on fit. | Inherited. | The R2 model would be bolted onto a post-and-join design that it rejects. |
+
+**Lean: A, then C in Phase 2.** Discord-first does sidestep the cold start *for the first
+community*, because the density problem is shrunk to fit one server rather than solved. The MVP
+needs only interactions (slash commands, buttons, DMs) and channel management. It doesn't read
+message content, so it needs no privileged Message Content intent.
+
+**MVP flow (sketch).**
+
+1. `/up game:<x> size:3-5 for:2h`, plus a one-time `/style` for comm-style.
+2. The bot DMs the player when a lobby forms, then creates a private temp voice and text channel
+   with those members only.
+3. After the channel has been empty for a while, the bot DMs each member a "recently played with"
+   card listing each person with the options **more · neutral · avoid · block · report**. Neutral
+   is the default, and ignoring the card is fine.
+4. "Recently played with" lasts 14 days (lean), so a player can set an edge later but not months
+   later.
