@@ -453,3 +453,52 @@ message content, so it needs no privileged Message Content intent.
    is the default, and ignoring the card is fine.
 4. "Recently played with" lasts 14 days (lean), so a player can set an edge later but not months
    later.
+
+## 10. Trust & safety
+
+The product puts strangers into voice channels with each other. That is its function, and it's
+also the main risk.
+
+- **18+ only at launch** (lean). Matching adults and minors as strangers in voice is the riskiest
+  thing this could do. In the MVP, age is self-attested and backed by the host community's own
+  rules. **Self-attestation is weak.** We accept that for a closed alpha and don't pretend it's
+  verification. Age bands are a hard constraint if minors are ever admitted, which is Ceryce's call
+  (§14).
+- **Avoid ≠ report.** An avoid is a *preference*: private, unreviewed, affecting only the avoider.
+  A report is an *allegation*: it goes to humans. Lean: filing a report also applies a hard block
+  *outside* the 5-slot cap. Abusive reporting is itself something moderators can act on.
+- **Human review, not automated verdicts.** Moderators act on reports. Mass avoidance only matters
+  alongside reports (§8). There's no hidden reputation score, no shadow-banning, and no automated
+  penalty to matching priority.
+- **Who moderates.** In the Phase 1 MVP, the **host community's moderators** do, through a private
+  mod channel that the bot posts reports into. They can remove a player from the matcher. We don't
+  run a central moderation team before Phase 2. How cross-community moderation works in Phase 2 is
+  an open question.
+- **Out of our sight after hand-off.** We don't record voice or read messages. Whatever happens in
+  the session reaches us only through reports. That is a deliberate privacy trade-off, and it limits
+  what moderators can do.
+- **Ban evasion.** Identity is a Discord account. Alt accounts are a known limit. Lean mitigation: a
+  minimum Discord account age and membership in the host server.
+- **Anchor wellbeing.** Anchors can opt out instantly and silently. They aren't asked to absorb
+  difficult players (lean; §14).
+- **No paywalled safety.** Blocking, avoiding and reporting are never paid features. Dota's
+  paywalled avoid list is the counter-example.
+
+## 11. Privacy
+
+- **Data held (minimum).** Platform user ID; games, size ranges and windows; comm-style,
+  interests and region; outgoing edges; co-play records; reports. **Not held:** message content,
+  voice, presence or activity scraped from Discord or games, contacts, or real names.
+- **Edges are the most sensitive data we keep.** Nobody sees an edge except its author, and that
+  includes the target. In a report review, moderators see the report and at most a *count* of
+  avoids (lean), never who avoided whom.
+- **No presence exposure.** No online indicators, no rosters and no "X is queued".
+- **Retention (lean).** Windows are deleted when they close. "Recently played with" lasts 14 days.
+  Soft avoids decay and are deleted once their weight is negligible. Co-play records older than 12
+  months are deleted. Reports are kept per moderation policy.
+- **User control.** Every user can view, export and delete their own data. Deleting an account
+  removes edges in both directions, including other people's edges *about* that person.
+- **No third parties.** No ads, no sale of data, no third-party analytics. Being open source means
+  anyone can check the matching rules and the data handling.
+- **Jurisdiction.** Lean: follow GDPR-style rights for everyone rather than by region.
+- **Phase 0 uses synthetic data only.** No real person's data is involved before Phase 1.
