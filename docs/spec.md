@@ -166,3 +166,178 @@ automatically from who is available across any game, uses a "match me with them 
 to reunite people opportunistically, and deliberately avoids friends lists, profiles and fixed
 groups. The idea itself is not what's new. Our contribution would be the combination and the open
 implementation.
+
+## 6. Core model
+
+**Proposed** (Margo). Lean: adopt. It follows directly from R2, R4 and R6.
+
+The model is **a weighted graph of people, not groups.**
+
+- **Player**: an account. It holds the games the player is up for, the group sizes they accept per
+  game, a coarse region/time zone, platform(s), optional *communication style* and *interests*, and
+  an optional **anchor** flag. Nothing about a player is browsable by anyone else.
+- **Edge (a → b)**: a *directed* relationship that only `a` sets, only about someone `a` has
+  actually played with (from "recently played with", R6). Each edge has one of three kinds:
+  - `more`: "I like playing with this person, match me with them more often" (R2).
+  - `avoid-soft`: "rather not". This weight decays over time (§7.2).
+  - `avoid-hard`: "never". Each player has a small capped number of these (§7.2).
+  - No edge means neutral, which is the default for everyone.
+- **Co-play record (a, b)**: how many sessions they have played together and when they last did.
+  The system writes this, not the users. It powers "recently played with" and the diminishing
+  returns in §7.3.
+- **Queue entry**: *"I'm up for {games} with {size range} people for the next {window}."* This is an
+  **availability window**, for example "for the next 2 hours, ping me", and not only a live
+  lobby wait. Windows are what make R2's *"the next time you're both playing"* work at low density
+  (§9).
+- **Session**: a matcher output. It's a set of players, a game, a size, and a hand-off (a temporary
+  Discord voice/text channel, or in-game handles shown only to the lobby). It is *not* a persistent
+  object people belong to.
+- **Group**: *there is no group object.* A "group" is simply a cluster of `more` edges whose members
+  keep being co-matched. When a cluster makes its own Discord and stops queuing, that is R5's
+  graduation.
+
+**Communication-style fields** (Proposed, Margo) are a small fixed set of self-described axes, and
+they are strong match signals:
+
+| Axis | Values |
+|---|---|
+| Comms | voice · text · either |
+| Talk | chatty · heads-down · either |
+| Intensity | sweaty · chill · either |
+| Optional | language(s), age band (18+ only at launch, §10), content/banter tolerance (open question) |
+
+**Interests** (R1, "other interests") are optional free tags, matched by overlap. They get a weak
+weight. Lean: interests act as tiebreakers, and comm-style carries the real weight, because a
+mismatch there, such as voice-chatty against text-heads-down, ruins a session and an interest
+mismatch doesn't.
+
+## 7. Matching algorithm
+
+### 7.1 Shape of the problem
+
+Every **tick** (lean: 20–30 s, run per game), the matcher takes the players currently in an open
+window for that game and splits some of them into lobbies. This is constrained graph clustering,
+close to *clique partitioning with size bounds*. It is NP-hard in general, but pools are small: tens
+to low hundreds of people per game per region. Lean approach:
+
+1. **Hard-filter** the candidate pairs (§7.2).
+2. **Seed** lobbies in priority order: longest-waiting players first, and anyone with pending
+   `more` edges to others who are queued.
+3. **Grow greedily** by marginal score.
+4. **Improve by local search** (swap and move) for a bounded time. For small pools (< ~40) an exact
+   ILP/CP-SAT solve is affordable and gives a quality baseline to measure the heuristic against in
+   Phase 0.
+
+A player can be left unmatched in any tick. They just stay in their window, and their wait-time
+priority goes up.
+
+### 7.2 Hard vs soft constraints
+
+**Hard. These are never violated.**
+
+- Same game, and a lobby size inside *every* member's accepted range.
+- Platform / cross-play compatibility, and a region or latency bound where the game needs one.
+- **Hard blocks.** If `a` has `avoid-hard` on `b`, then `a` and `b` are never in the same lobby.
+  (Proposed, Margo.) Lean: **5 per player**, which lines up with Overwatch's 3 pinned and Dota's
+  paywalled 25. They don't decay. Because of the cap, a player can't use hard blocks to exclude a
+  meaningful share of a pool (see §8).
+- Age band separation (§10).
+- Mandatory filters the player sets on themselves, such as "voice required".
+
+**Soft. These are weighted and can be broken when the pool is thin.**
+
+- `avoid-soft` edges: a large negative weight that **decays** (lean: half-life around 30 days,
+  refreshed if re-applied). Overwatch's 7-day expiry is the shipped precedent.
+- `more` edges: positive weight (§7.3).
+- Comm-style and intensity compatibility: medium weight. Interest overlap: low weight.
+- Newcomer / low-connectivity boost and anchor placement (§7.4).
+- Wait-time priority: this grows with time in window and is what eventually pays for breaking soft
+  constraints.
+- Small random noise (§7.6).
+
+**An avoid only affects the avoider's own matches** (Proposed, Margo). `a` avoiding `b` becomes a
+constraint on lobbies containing `a`. It is never a property of `b`: it doesn't show up as `b`'s
+reputation or lower `b`'s priority anywhere else. Lean: adopt. This is the rule that stops the
+rich-get-richer and weaponisation problems from turning into a hidden global score.
+
+### 7.3 How "match me with them more often" is weighted
+
+A lobby's score is the sum of pairwise terms plus per-player terms. For a directed `more` edge
+`a → b`:
+
+- **Base weight `M`**, applied when both are in the lobby. If the edge is mutual (`b → a` also
+  exists), the pair gets a bonus. Mutuality is used internally and is **never revealed** (§7.6).
+- **Asymmetry rule.** If `a` has `more` on `b` and `b` has *any* avoid on `a`, the avoid wins
+  outright. A `more` can never override the other person's avoid. This is R4 applied to the edge
+  case it names.
+- **Diminishing returns in co-play count**, for example `M / (1 + k·log(1 + n_ab))`. This way a pair
+  that has already played 40 times doesn't swamp every lobby, and new people keep getting slots.
+- **Recency.** Pairs who haven't co-played recently get a small "reunion" bump. R2 is about finding
+  each other again, so the weight should rise the longer it has been.
+- **"Core + one or two" composition bonus** (derived from R2). The best lobby, as Ceryce described
+  it, is a core that already likes each other plus one or two fresh people. The objective adds a
+  bonus for lobbies with a `more`-connected core of ≥ 2 **and** at least one open seat filled by
+  someone with no history with that core (a newcomer or stranger). This is how new people get into
+  groups. Without it, the matcher would converge on the same closed clusters.
+
+Implicit signals, such as the same people re-queuing together or long sessions, are **not used in
+v1** (lean). Explicit signals are easier to explain, easier to delete and easier to audit. This is
+an open question for later.
+
+### 7.4 Rich-get-richer mitigations
+
+The risk (R5): a pure affinity objective pulls well-liked players together, and players with many
+avoids end up matched only with each other.
+
+- **Newcomer / low-connectivity boost** (Proposed, Margo). Players with few `more` edges, or who
+  are new, get a priority bonus to fill the "one or two" seats in cores. Lean: adopt, and decay it
+  over the first ~20 sessions.
+- **Anchors** (R7). Anchors are players who opt in to "put me with newcomers and strangers". The
+  matcher prefers placing newcomers into lobbies with an anchor. Anchors get nothing visible for it.
+  No badges, because a badge turns into a status game (lean). Open details: whether anchors also
+  host lobbies of players with high avoid counts, and whether that is fair to ask of anyone
+  (§14).
+- **Assortativity guard.** Phase 0 measures how often players whose inbound-avoid count is in the
+  top decile are matched *only* with each other. If that happens, the matcher adds a mixing term,
+  and that term is always overridden by the avoider-local constraints. **Honest caveat:** this pulls
+  against R4. If many people genuinely avoid someone, respecting all of those avoids *does*
+  concentrate that person among non-avoiders. The spec does not claim to solve this. Phase 0 is
+  there to measure how bad it gets.
+
+### 7.5 Relaxation when the pool is thin
+
+Proposed (Margo). The matcher widens the pool **before** it fails anyone. Each step is presented to
+the user as ordinary queue wait, never as "no one wants to play with you":
+
+1. **Strict.** All soft preferences weighted normally.
+2. **Widen time zone / region**, within whatever latency bound the game has.
+3. **Widen group size** inside the range the player accepted, for example 5 → 4.
+4. **Neighbouring games.** Lean: only games the player has *already listed*, never inferred ones.
+   An alternative the matcher could offer: "nobody's up for X, 3 people are up for Y which you also
+   listed".
+5. **Larger community.** Only once more than one community exists (§9, Phase 2), and only for
+   players who opted in.
+6. **Break soft avoids**, lowest-weight and most-decayed first. Hard blocks are never broken.
+7. **Keep waiting.** The window stays open and the player is pinged if a lobby forms.
+
+**Which player gets left over is a fairness decision.** When the pool doesn't divide evenly into
+lobbies, somebody waits. Wait-time priority makes sure it isn't the same person every time. That
+matters most for a heavily soft-avoided player, whose growing priority eventually *forces* a soft
+avoid to break rather than letting them wait forever.
+
+### 7.6 Silent rejection
+
+The risk (R5): `b` works out that `a` avoided them.
+
+- **Never show who is online or queued** (Proposed, Margo). There's no presence, no "3 people you
+  like are playing", and no queue roster. You only learn who you're matched with when the lobby
+  forms.
+- **Noise in matching** (Proposed, Margo). A small random term means a missing reunion looks the
+  same as bad timing. Lean: adopt, and tune it in Phase 0 against a *detection test*. That test
+  asks whether a statistically motivated `b` could tell "a avoided me" apart from "a and I were
+  unlucky" at realistic pool sizes.
+- **Edges are never revealed.** That covers `more`, `avoid` and mutual `more` alike. There is no
+  "they liked you too!", because that is the dating-app mechanic R1 rejects (lean; §14).
+- **Honest limit.** In a tiny pool, such as a niche game where the same six people are always
+  online, no amount of noise hides a consistent absence. R5 accepts this. The spec does not claim
+  otherwise.
