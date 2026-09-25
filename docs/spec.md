@@ -502,3 +502,104 @@ also the main risk.
   anyone can check the matching rules and the data handling.
 - **Jurisdiction.** Lean: follow GDPR-style rights for everyone rather than by region.
 - **Phase 0 uses synthetic data only.** No real person's data is involved before Phase 1.
+
+## 12. Phases
+
+### Phase 0: matcher simulator (nothing user-facing)
+
+This phase builds the real matcher, runs it against **synthetic populations**, and measures the
+risks from R3, R5 and R8 before any real person is involved. Its output is numbers, and those
+numbers decide whether Phase 1 is worth building in the shape described here.
+
+**Build:**
+
+- **Population generator.** Players get game lists, size ranges, availability schedules (time zone
+  and evening peaks), comm-styles, and a hidden *compatibility* vector. After each simulated session,
+  that vector produces ground-truth "enjoyed / didn't" outcomes with noise, and those outcomes turn
+  into `more` / `avoid` edges at configurable rates. Included archetypes: abrasive players,
+  avoid-happy players, anchors, newcomers arriving over time, and a **coordinated clique** that
+  hard-blocks one target.
+- **Matcher v0.** This is the §7 algorithm as real, reusable code, not a mock, plus an exact CP-SAT
+  solve on small pools as a quality baseline.
+- **Simulation harness.** It runs simulated weeks under a parameter sweep over pool size, lobby
+  size, window length, weights, noise, hard-block cap and decay.
+
+**Measure:**
+
+| Question | Metric |
+|---|---|
+| R8 lockout | Share of peak ticks in which any player is unplaceable because of hard blocks, by `N` and `L`. Also the clique scenario's lockout hours per week. |
+| R3 density | Wait-time distribution for a lobby, by `M` and window habit. This replaces §9.1's guesses. |
+| R2 rematch | For pairs with mutual `more`: time to next co-match, and the share reunited within 14 days. |
+| Groups forming | Emergence of stable clusters (≥ 3 players, co-matched ≥ k times). Simulated hours per pair against Hall's ~50 h mark. |
+| R5 rich-get-richer | Distribution of match rate and lobby affinity per player. Bottom-decile vs median. Assortativity of inbound-avoid count, i.e. whether high-avoid players get matched only with each other. |
+| Newcomers / anchors | Sessions until a newcomer's first mutual `more`, with and without the boost and anchors. |
+| R5 silent rejection | **Detection test:** how well can a motivated player's own match history tell whether a specific person avoided them, by pool size and noise level? |
+
+**Exit criteria.** The thresholds are Ceryce's call, informed by the first run. Suggested starting
+points for 4-player co-op, one region:
+
+- Median peak wait under 10 minutes at `M` ≈ 200 with availability windows.
+- Hard-block lockout in under 1% of peak ticks at realistic avoid rates.
+- Bottom-decile match rate at least 50% of the median.
+- Most newcomers reach a mutual `more` within 5 sessions.
+- Detection-test advantage near chance at `N` ≥ 20.
+
+**Kill / rethink criterion:** if no parameter set meets these at `M` ≤ ~500, the MVP shape needs
+rethinking before Phase 1. Possible changes are longer windows, smaller lobbies, or cross-community
+pooling from day one.
+
+### Phase 1: Discord bot, closed alpha
+
+One community, 1–3 co-op games, one region, 18+. It runs the §9.3 flow and uses matcher v0 from
+Phase 0. Moderation is done by the host community's mods. Success: people use it more than once,
+reunions happen, and at least one group graduates to its own server.
+
+### Phase 2: more communities
+
+Onboard additional servers. Opt-in cross-community pooling (§7.5 step 5). Self-hosting docs, so
+communities can run their own instance. A cross-community moderation model.
+
+### Phase 3: only if earned
+
+Another front-end (for example web) or other platforms. This happens only if Phases 1–2 show real
+pull. It isn't planned in any more detail now.
+
+## 13. Deliberately not built
+
+These go beyond the non-goals in §3. They are concrete features we will refuse even when someone
+asks for them:
+
+- Friends lists, followers, public profiles, people search, "people you may like".
+- Showing that a `more` was mutual ("they liked you too!").
+- Online presence, queue rosters, "your favourites are playing now".
+- Visible reputation: karma, endorsements, ratings, badges (including anchor badges).
+- Our own chat, DMs or voice.
+- Calendars, recurring events, fixed group rosters.
+- Skill ratings or MMR.
+- Game API or overlay integrations (hand-off is by channel or handle).
+- Streaks, engagement nudges, re-engagement notifications. Notifications are limited to "your lobby
+  formed" and the post-session card.
+- Paid tiers for safety features. Paid "more avoid slots" in particular.
+
+## 14. Open questions
+
+| # | Question | Lean | Whose call |
+|---|---|---|---|
+| 1 | **Product name** | Decide after Phase 0, once the MVP shape is settled. Check for clashes with Discord app directory and trademark listings before committing. | Ceryce |
+| 2 | **Platform / MVP shape** | Discord bot in one existing community (§9.3 option A), then a cross-server network. | Ceryce |
+| 3 | **First community and games** | A community she already belongs to, 4-player co-op PvE, one region. | Ceryce |
+| 4 | **License** | AGPL-3.0, so hosted forks of a community service stay open. Alternative: Apache-2.0 for maximum reuse, which suits the "contribution to the world" framing but allows closed hosted forks. | Ceryce |
+| 5 | **Monetization, or none** | None. Donations to cover hosting at most, and never paywalled safety (§13). | Ceryce |
+| 6 | **Hosting** | Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
+| 7 | Implementation language | Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
+| 8 | Hard-block cap | 5, then adjust using Phase 0 lockout data. | Ceryce, after Phase 0 |
+| 9 | Soft-avoid decay | Half-life ~30 days. Tune in Phase 0. | Engineering |
+| 10 | Reveal mutual `more`? | Never. That is the dating-app mechanic. | Ceryce |
+| 11 | Implicit signals (co-queue, session length) | Not in v1. Explicit signals only. | Ceryce |
+| 12 | Should anchors also absorb high-avoid players? | No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
+| 13 | Minors | 18+ only. Revisit only with real age assurance and a separate design. | Ceryce |
+| 14 | Microsoft patent US 7,677,970 status | Confirm it has lapsed before Phase 1. | Ceryce (legal) |
+| 15 | Phase 0 exit thresholds | The §12 suggestions as the starting point. | Ceryce, after the first sim run |
+| 16 | Banter/content-tolerance axis | Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
+| 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
