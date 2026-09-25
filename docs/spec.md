@@ -1,4 +1,4 @@
-# Spec: group matchmaking for multiplayer games (working name)
+# Philotes — spec: group matchmaking for multiplayer games
 
 | | |
 |---|---|
@@ -6,7 +6,7 @@
 | **Spec version** | v0.1, 2026-09-24 (first draft) |
 | **Owner / decider** | Ceryce |
 | **Canonical source** | This file. Other formats are rendered from it. |
-| **Product name** | Undecided. `multiplayer-matchmaking` is only the working folder name ([§14](#14-open-questions)). |
+| **Product name** | **Philotes**, after the Greek spirit of friendship and affection. Ruled 2026-09-24 (Ceryce picked it from a shortlist). |
 
 How to read this spec: **Rulings** (§4) are Ceryce's decisions and hold unless she changes them.
 Anything marked **Proposed** is a design idea from the conversation that started this project. Most
@@ -609,7 +609,7 @@ asks for them:
 
 | # | Question | Lean | Whose call |
 |---|---|---|---|
-| 1 | **Product name** | Decide after Phase 0, once the MVP shape is settled. Check for clashes with Discord app directory and trademark listings before committing. | Ceryce |
+| 1 | **Product name** | **RULED 2026-09-24: Philotes.** GitHub check that day: `kumouri/philotes` free; a handful of tiny unrelated repos share the name, none in gaming. Still check the Discord app directory and trademark listings before a public launch. | Ceryce |
 | 2 | **Platform / MVP shape** | Discord bot in one existing community (§9.3 option A), then a cross-server network. | Ceryce |
 | 3 | **First community and games** | A community she already belongs to, 4-player co-op PvE, one region. | Ceryce |
 | 4 | **License** | AGPL-3.0, so hosted forks of a community service stay open. Alternative: Apache-2.0 for maximum reuse, which suits the "contribution to the world" framing but allows closed hosted forks. | Ceryce |
