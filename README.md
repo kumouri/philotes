@@ -15,3 +15,8 @@ swiping.
   matcher, the density problem, trust & safety, privacy, phases and open questions.
 
 Markdown is canonical. Any other format is rendered from the `.md` files.
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE). If you run a modified version of Philotes as a
+network service, you must make your changes available to its users under the same licence.

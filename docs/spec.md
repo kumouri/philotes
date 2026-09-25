@@ -612,7 +612,7 @@ asks for them:
 | 1 | **Product name** | **RULED 2026-09-24: Philotes.** GitHub check that day: `kumouri/philotes` free; a handful of tiny unrelated repos share the name, none in gaming. Still check the Discord app directory and trademark listings before a public launch. | Ceryce |
 | 2 | **Platform / MVP shape** | Discord bot in one existing community (§9.3 option A), then a cross-server network. | Ceryce |
 | 3 | **First community and games** | A community she already belongs to, 4-player co-op PvE, one region. | Ceryce |
-| 4 | **License** | AGPL-3.0, so hosted forks of a community service stay open. Alternative: Apache-2.0 for maximum reuse, which suits the "contribution to the world" framing but allows closed hosted forks. | Ceryce |
+| 4 | **License** | **RULED 2026-09-24: AGPL-3.0** (Ceryce: "Let's go AGPL-3.0."), so a modified version run as a hosted service must publish its changes. `LICENSE` added. | Ceryce |
 | 5 | **Monetization, or none** | None. Donations to cover hosting at most, and never paywalled safety (§13). | Ceryce |
 | 6 | **Hosting** | Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
 | 7 | Implementation language | Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
