@@ -207,7 +207,7 @@ they are strong match signals:
 | Comms | voice · text · either |
 | Talk | chatty · heads-down · either |
 | Intensity | sweaty · chill · either |
-| Optional | language(s), age band (18+ only at launch, §10), content/banter tolerance (open question) |
+| Optional | language(s), age band (18+ only at launch, §10), content/banter tolerance (tested in alpha, §14 #16) |
 
 **Interests** (R1, "other interests") are optional free tags, matched by overlap. They get a weak
 weight. Lean: interests act as tiebreakers, and comm-style carries the real weight, because a
@@ -284,8 +284,8 @@ A lobby's score is the sum of pairwise terms plus per-player terms. For a direct
   groups. Without it, the matcher would converge on the same closed clusters.
 
 Implicit signals, such as the same people re-queuing together or long sessions, are **not used in
-v1** (lean). Explicit signals are easier to explain, easier to delete and easier to audit. This is
-an open question for later.
+v1** (ruled 2026-10-05, §14 #11). Explicit signals are easier to explain, easier to delete and easier to
+audit. Implicit signals can be revisited after v1.
 
 ### 7.4 Rich-get-richer mitigations
 
@@ -297,9 +297,8 @@ avoids end up matched only with each other.
   over the first ~20 sessions.
 - **Anchors** (R7). Anchors are players who opt in to "put me with newcomers and strangers". The
   matcher prefers placing newcomers into lobbies with an anchor. Anchors get nothing visible for it.
-  No badges, because a badge turns into a status game (lean). Open details: whether anchors also
-  host lobbies of players with high avoid counts, and whether that is fair to ask of anyone
-  (§14).
+  No badges, because a badge turns into a status game (lean). Anchors are for newcomers only and
+  are never asked to host lobbies of players with high avoid counts (ruled 2026-10-05, §14 #12).
 - **Assortativity guard.** Phase 0 measures how often players whose inbound-avoid count is in the
   top decile are matched *only* with each other. If that happens, the matcher adds a mixing term,
   and that term is always overridden by the avoider-local constraints. **Honest caveat:** this pulls
@@ -340,7 +339,7 @@ The risk (R5): `b` works out that `a` avoided them.
   asks whether a statistically motivated `b` could tell "a avoided me" apart from "a and I were
   unlucky" at realistic pool sizes.
 - **Edges are never revealed.** That covers `more`, `avoid` and mutual `more` alike. There is no
-  "they liked you too!", because that is the dating-app mechanic R1 rejects (lean; §14).
+  "they liked you too!", because that is the dating-app mechanic R1 rejects (ruled 2026-10-05, §14 #10).
 - **Honest limit.** In a tiny pool, such as a niche game where the same six people are always
   online, no amount of noise hides a consistent absence. R5 accepts this. The spec does not claim
   otherwise.
@@ -482,7 +481,7 @@ message content, so it needs no privileged Message Content intent.
 The product puts strangers into voice channels with each other. That is its function, and it's
 also the main risk.
 
-- **18+ only at launch** (lean). Matching adults and minors as strangers in voice is the riskiest
+- **18+ only at launch** (ruled 2026-10-05, §14 #13). Matching adults and minors as strangers in voice is the riskiest
   thing this could do. In the MVP, age is self-attested and backed by the host community's own
   rules. **Self-attestation is weak.** We accept that for a closed alpha and don't pretend it's
   verification. Age bands are a hard constraint if minors are ever admitted, which is Ceryce's call
@@ -503,7 +502,7 @@ also the main risk.
 - **Ban evasion.** Identity is a Discord account. Alt accounts are a known limit. Lean mitigation: a
   minimum Discord account age and membership in the host server.
 - **Anchor wellbeing.** Anchors can opt out instantly and silently. They aren't asked to absorb
-  difficult players (lean; §14).
+  difficult players (ruled 2026-10-05, §14 #12).
 - **No paywalled safety.** Blocking, avoiding and reporting are never paid features. Dota's
   paywalled avoid list is the counter-example.
 
@@ -610,19 +609,21 @@ asks for them:
 | # | Question | Lean | Whose call |
 |---|---|---|---|
 | 1 | **Product name** | **RULED 2026-09-24: Philotes.** GitHub check that day: `kumouri/philotes` free; a handful of tiny unrelated repos share the name, none in gaming. Still check the Discord app directory and trademark listings before a public launch. | Ceryce |
-| 2 | **Platform / MVP shape** | Discord bot in one existing community (§9.3 option A), then a cross-server network. | Ceryce |
+| 2 | **Platform / MVP shape** | **RULED 2026-10-05: lean taken.** Discord bot in one existing community (§9.3 option A), then a cross-server network. | Ceryce |
 | 3 | **First community and games** | A community she already belongs to, 4-player co-op PvE, one region. | Ceryce |
 | 4 | **License** | **RULED 2026-09-24: AGPL-3.0** (Ceryce: "Let's go AGPL-3.0."), so a modified version run as a hosted service must publish its changes. `LICENSE` added. | Ceryce |
-| 5 | **Monetization, or none** | None. Donations to cover hosting at most, and never paywalled safety (§13). | Ceryce |
-| 6 | **Hosting** | Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
-| 7 | Implementation language | Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
+| 5 | **Monetization, or none** | **RULED 2026-10-05: lean taken.** None. Donations to cover hosting at most, and never paywalled safety (§13). | Ceryce |
+| 6 | **Hosting** | **RULED 2026-10-05: lean taken.** Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
+| 7 | Implementation language | **RULED 2026-10-05: lean taken.** Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
 | 8 | Hard-block cap | 5, then adjust using Phase 0 lockout data. | Ceryce, after Phase 0 |
 | 9 | Soft-avoid decay | Half-life ~30 days. Tune in Phase 0. | Engineering |
-| 10 | Reveal mutual `more`? | Never. That is the dating-app mechanic. | Ceryce |
-| 11 | Implicit signals (co-queue, session length) | Not in v1. Explicit signals only. | Ceryce |
-| 12 | Should anchors also absorb high-avoid players? | No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
-| 13 | Minors | 18+ only. Revisit only with real age assurance and a separate design. | Ceryce |
+| 10 | Reveal mutual `more`? | **RULED 2026-10-05: lean taken.** Never. That is the dating-app mechanic. | Ceryce |
+| 11 | Implicit signals (co-queue, session length) | **RULED 2026-10-05: lean taken.** Not in v1. Explicit signals only. | Ceryce |
+| 12 | Should anchors also absorb high-avoid players? | **RULED 2026-10-05: lean taken.** No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
+| 13 | Minors | **RULED 2026-10-05: lean taken.** 18+ only. Revisit only with real age assurance and a separate design. | Ceryce |
 | 14 | Microsoft patent US 7,677,970 status | Confirm it has lapsed before Phase 1. | Ceryce (legal) |
 | 15 | Phase 0 exit thresholds | The §12 suggestions as the starting point. | Ceryce, after the first sim run |
-| 16 | Banter/content-tolerance axis | Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
+| 16 | Banter/content-tolerance axis | **RULED 2026-10-05: lean taken.** Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
 | 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
+
+"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. Still open: #3 (which community and games), and by design #8, #9 and #15 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
