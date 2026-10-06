@@ -426,13 +426,15 @@ are what R2 depends on, and they are harder to estimate on paper. Phase 0 measur
 
 ### 9.2 Start narrow
 
-The engine is game-agnostic (R1). **The launch should not be.** Lean: one existing community, 1–3
-games, one region. Prefer **co-op PvE games with 4-player lobbies** and no skill balancing, where
+The engine is game-agnostic (R1). **The launch should not be.** **Ruled 2026-10-05 (§14 #3): the first
+niche is async Archipelago multiworlds** (below). The earlier lean stays as the fallback and the likely
+second niche: one existing community, 1–3 games, one region. Prefer **co-op PvE games with 4-player lobbies** and no skill balancing, where
 sessions are sociable and voice is common: the "4-player co-op" genre. Small lobbies need less
 density and resist lockout (§8), and skill doesn't have to be matched.
 
-**Candidate launch niche: async Archipelago multiworlds** (added 2026-09-24; Ceryce: *"definitely add it
-as a candidate launch niche. I wasn't even thinking async archipelago, but that's genius."*).
+**First launch niche: async Archipelago multiworlds** (added 2026-09-24 as a candidate; Ceryce: *"definitely add it
+as a candidate launch niche. I wasn't even thinking async archipelago, but that's genius."* Made the first
+niche 2026-10-05, §14 #3: *"I thought we decided on async archipelago as our first?"*).
 [Archipelago](https://archipelago.gg/faq/en/) is a cross-game randomizer that builds one shared
 multiworld from each player's own game, described by a YAML file, and supports **async** play, where
 players connect at their own pace. As of 2026-09-24 a quick search found no automatic matcher or
@@ -558,8 +560,11 @@ numbers decide whether Phase 1 is worth building in the shape described here.
 | Newcomers / anchors | Sessions until a newcomer's first mutual `more`, with and without the boost and anchors. |
 | R5 silent rejection | **Detection test:** how well can a motivated player's own match history tell whether a specific person avoided them, by pool size and noise level? |
 
-**Exit criteria.** The thresholds are Ceryce's call, informed by the first run. Suggested starting
-points for 4-player co-op, one region:
+**Exit criteria.** The thresholds are Ceryce's call, informed by the first run. The suggestions below
+were written for live 4-player co-op in one region. Since the first niche is now async Archipelago
+(§14 #3), Phase 0 also needs async equivalents, such as time for a seed to fill within a weekly
+sign-up window instead of peak queue wait. Those are still to be written. Suggested starting points
+for 4-player co-op, one region:
 
 - Median peak wait under 10 minutes at `M` ≈ 200 with availability windows.
 - Hard-block lockout in under 1% of peak ticks at realistic avoid rates.
@@ -573,7 +578,7 @@ pooling from day one.
 
 ### Phase 1: Discord bot, closed alpha
 
-One community, 1–3 co-op games, one region, 18+. It runs the §9.3 flow and uses matcher v0 from
+One community, async Archipelago multiworlds first (§14 #3), 18+. It runs the §9.3 flow and uses matcher v0 from
 Phase 0. Moderation is done by the host community's mods. Success: people use it more than once,
 reunions happen, and at least one group graduates to its own server.
 
@@ -610,7 +615,7 @@ asks for them:
 |---|---|---|---|
 | 1 | **Product name** | **RULED 2026-09-24: Philotes.** GitHub check that day: `kumouri/philotes` free; a handful of tiny unrelated repos share the name, none in gaming. Still check the Discord app directory and trademark listings before a public launch. | Ceryce |
 | 2 | **Platform / MVP shape** | **RULED 2026-10-05: lean taken.** Discord bot in one existing community (§9.3 option A), then a cross-server network. | Ceryce |
-| 3 | **First community and games** | A community she already belongs to, 4-player co-op PvE, one region. | Ceryce |
+| 3 | **First community and games** | **RULED 2026-10-05: async Archipelago multiworlds first** (§9.2; Ceryce: "I thought we decided on async archipelago as our first?"). This replaces the earlier lean (a community she already belongs to, 4-player co-op PvE, one region). Still open: which Discord server hosts the Phase 1 bot. | Ceryce |
 | 4 | **License** | **RULED 2026-09-24: AGPL-3.0** (Ceryce: "Let's go AGPL-3.0."), so a modified version run as a hosted service must publish its changes. `LICENSE` added. | Ceryce |
 | 5 | **Monetization, or none** | **RULED 2026-10-05: lean taken.** None. Donations to cover hosting at most, and never paywalled safety (§13). | Ceryce |
 | 6 | **Hosting** | **RULED 2026-10-05: lean taken.** Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
@@ -626,4 +631,4 @@ asks for them:
 | 16 | Banter/content-tolerance axis | **RULED 2026-10-05: lean taken.** Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
 | 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
 
-"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. Still open: #3 (which community and games), and by design #8, #9 and #15 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
+"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8, #9 and #15 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
