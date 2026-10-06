@@ -24,6 +24,8 @@ from .config import Scenario, async_baseline, flatten, live_baseline, with_overr
 from .metrics import compute, lockout_by_n
 from .sim import Simulation
 
+LIVE_WEEKS = 12  # 2 burn-in + 10 measured
+ASYNC_WEEKS = 26  # 4 burn-in + 22 measured sign-up windows
 CLOSE_ONLY = {"shape.cadence_hours": 168.0, "shape.ladder_minutes": "1e9,1e9,1e9"}
 
 
@@ -173,6 +175,66 @@ PHASE0: list[Group] = [
         _grid(**{"weights.noise": [0.0, 0.5, 2.0], "population.M": [50, 100, 200, 500]}),
     ),
     Group(
+        "live-newcomer-batch",
+        "live",
+        "§7.4 again where the matcher has choice: 15-minute batches, M = 200 and 500.",
+        _grid(
+            **{
+                "policy.newcomer_decay_sessions": [0, 5, 10, 20, 40],
+                "policy.anchors_enabled": [True, False],
+                "population.M": [200, 500],
+            }
+        ),
+        base={"population.newcomer_rate": 0.06, "shape.tick_seconds": 900.0},
+        replicate_factor=2,
+    ),
+    Group(
+        "async-newcomer-batch",
+        "async",
+        "§7.4 again where the matcher has choice: async batch at close, M = 100.",
+        _grid(
+            **{
+                "policy.newcomer_decay_sessions": [0, 5, 10, 20, 40],
+                "policy.anchors_enabled": [True, False],
+            }
+        ),
+        base={"population.newcomer_rate": 0.06, **CLOSE_ONLY},
+        replicate_factor=2,
+    ),
+    Group(
+        "live-more-weight",
+        "live",
+        "R2 vs silent rejection: does a stronger `more` buy reunions, and at what detection cost?",
+        _grid(
+            **{
+                "weights.more": [30.0, 60.0, 120.0, 240.0, 480.0],
+                "shape.tick_seconds": [30.0, 900.0],
+            }
+        ),
+    ),
+    Group(
+        "async-more-weight",
+        "async",
+        "R2 vs silent rejection, async M = 100: `more` weight, rolling 24 h vs batch at close.",
+        [
+            {"weights.more": w, **_cadence(c)}
+            for w in [30.0, 60.0, 120.0, 240.0, 480.0]
+            for c in ["24", "close"]
+        ],
+    ),
+    Group(
+        "detection-placebo",
+        "live",
+        "Validation: detection AUC with avoids ignored by the matcher (the other-channel floor).",
+        _grid(**{"policy.honor_avoids": [True, False], "population.M": [200, 500]}),
+    ),
+    Group(
+        "async-detection-placebo",
+        "async",
+        "Validation: async detection AUC with avoids ignored, rolling 6 h and batch at close.",
+        [{"policy.honor_avoids": h, **_cadence(c)} for h in [True, False] for c in ["6", "close"]],
+    ),
+    Group(
         "matcher-validation",
         "live",
         "Heuristic vs hybrid (exact CP-SAT on pools ≤ 40): do the headline metrics move?",
@@ -194,7 +256,11 @@ GROUPS = {g.name: g for g in PHASE0}
 
 
 def scenario_for(group: Group, arm: dict[str, Any], seed: int) -> Scenario:
-    base = live_baseline(weeks=12) if group.shape == "live" else async_baseline(weeks=26)
+    base = (
+        live_baseline(weeks=LIVE_WEEKS)
+        if group.shape == "live"
+        else async_baseline(weeks=ASYNC_WEEKS)
+    )
     scn = with_overrides(base, {**(group.base or {}), **arm})
     return with_overrides(scn, {"seed": seed, "name": group.name})
 

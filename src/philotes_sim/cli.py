@@ -3,6 +3,7 @@
 philotes-sim run --shape live --set population.M=200 --set shape.habit=generous
 philotes-sim run --shape async --set shape.cadence_hours=24 --out results/one
 philotes-sim sweep --out results/phase0 [--groups live-density,async-density] [--replicates 5]
+philotes-sim report --from results/phase0
 philotes-sim compare-matchers --out results/quality
 philotes-sim list
 """
@@ -50,15 +51,24 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 def cmd_sweep(args: argparse.Namespace) -> None:
     from .experiments import GROUPS, run_groups
-    from .report import write_outputs
+    from .report import save_rows, write_outputs
 
     names = args.groups.split(",") if args.groups else list(GROUPS)
     unknown = [n for n in names if n not in GROUPS]
     if unknown:
         raise SystemExit(f"unknown groups: {unknown}; see `philotes-sim list`")
     rows = run_groups(names, args.replicates, args.workers, lambda s: print(s, flush=True))
+    save_rows(rows, Path(args.out))
     write_outputs(rows, Path(args.out), "Philotes Phase 0 sweep")
     print(f"wrote {args.out}/runs.csv, summary.csv, lockout_by_n.csv, report.md")
+
+
+def cmd_report(args: argparse.Namespace) -> None:
+    from .report import load_rows, write_outputs
+
+    out = Path(args.from_dir)
+    write_outputs(load_rows(out), out, "Philotes Phase 0 sweep")
+    print(f"rebuilt {out}/summary.csv, lockout_by_n.csv, report.md")
 
 
 def cmd_compare(args: argparse.Namespace) -> None:
@@ -104,6 +114,10 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--workers", type=int, default=None)
     s.add_argument("--out", required=True)
     s.set_defaults(func=cmd_sweep)
+
+    rp = sub.add_parser("report", help="rebuild summary and report.md from a sweep's runs.jsonl")
+    rp.add_argument("--from", dest="from_dir", required=True)
+    rp.set_defaults(func=cmd_report)
 
     c = sub.add_parser("compare-matchers", help="heuristic vs exact CP-SAT on captured pools")
     c.add_argument("--pools", type=int, default=30, help="pools per source")

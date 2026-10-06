@@ -286,6 +286,15 @@ def compute(rec: Record) -> dict[str, float]:
         if p.sessions >= horizon
         or (p.first_mutual_session is not None and p.first_mutual_session <= horizon)
     ]
+    # Mechanism check for §7.4: how often a newcomer's first sessions include an anchor.
+    nc = {p.pid for p in newcomers}
+    early: dict[int, list[bool]] = defaultdict(list)
+    for s in rec.sessions:
+        for p in s.members:
+            if p in nc and len(early[p]) < horizon:
+                early[p].append(any(rec.players[o].anchor for o in s.members if o != p))
+    flags = [f for v in early.values() for f in v]
+    m["newcomer_early_sessions_with_anchor"] = _share(flags)
     m["newcomers"] = len(newcomers)
     m["newcomers_eligible"] = len(eligible)
     m["newcomer_within_horizon_share"] = _share(
@@ -378,21 +387,43 @@ def detection(rec: Record, by_player, by_pair, tpid) -> dict[str, float]:
     }
 
 
+def mutual_spans(rec: Record) -> dict[tuple[int, int], list[tuple[float, bool]]]:
+    """Per pair, the time-ordered (t, became_mutual) events: True = became mutual, False = broke."""
+    spans: dict[tuple[int, int], list[tuple[float, bool]]] = defaultdict(list)
+    for t, a, b in rec.mutual_events:
+        spans[(min(a, b), max(a, b))].append((t, True))
+    for t, a, b in rec.mutual_breaks:
+        spans[(min(a, b), max(a, b))].append((t, False))
+    for v in spans.values():
+        v.sort()
+    return spans
+
+
+def is_mutual_at(events: list[tuple[float, bool]], t: float) -> bool:
+    state = False
+    for te, became in events:
+        if te > t:
+            break
+        state = became
+    return state
+
+
 def cosignup_reunion(rec: Record, first_choice: bool = True) -> float:
-    """Async R2: of mutual-`more` pairs who both signed up for the same window after the pair
-    became mutual, asking for the same goal length first (``first_choice``) or sharing any listed
-    length, the share placed in the same seed."""
+    """Async R2: of pairs who were mutual `more` when both had signed up for the same window,
+    asking for the same goal length first (``first_choice``) or sharing any listed length, the
+    share placed in the same seed."""
     ms = rec.measure_start
     by_window: dict[tuple[int, int], object] = {}
     for e in rec.entries:
         if e.open_t >= ms:
             by_window[(e.pid, e.window)] = e
     windows = sorted({e.window for e in rec.entries if e.open_t >= ms})
+    spans = mutual_spans(rec)
     tries, hits = 0, 0
-    for t_m, a, b in rec.mutual_events:
+    for (a, b), events in spans.items():
         for w in windows:
             ea, eb = by_window.get((a, w)), by_window.get((b, w))
-            if ea is None or eb is None or min(ea.open_t, eb.open_t) < t_m:
+            if ea is None or eb is None or not is_mutual_at(events, max(ea.open_t, eb.open_t)):
                 continue
             if first_choice and ea.games[0] != eb.games[0]:
                 continue

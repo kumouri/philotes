@@ -79,6 +79,7 @@ class Record:
     sessions: list[Session]
     store: EdgeStore
     mutual_events: list[tuple[float, int, int]]
+    mutual_breaks: list[tuple[float, int, int]]  # a mutual pair stopped being mutual
     first_cards: dict[tuple[int, int], tuple[float, str | None]]  # (a,b) → (t_end, a's edge on b)
     lockout: list[LockoutSample]
     target_minutes_waiting: float
@@ -114,6 +115,7 @@ class Simulation:
         self.entries: list[Entry] = []
         self.sessions: list[Session] = []
         self.mutual_events: list[tuple[float, int, int]] = []
+        self.mutual_breaks: list[tuple[float, int, int]] = []
         self.first_cards: dict[tuple[int, int], tuple[float, str | None]] = {}
         self.pending_first: dict[int, list[tuple[int, int]]] = {}
         self.lockout: list[LockoutSample] = []
@@ -184,6 +186,7 @@ class Simulation:
             sessions=self.sessions,
             store=self.store,
             mutual_events=self.mutual_events,
+            mutual_breaks=self.mutual_breaks,
             first_cards=self.first_cards,
             lockout=self.lockout,
             target_minutes_waiting=self.target_wait,
@@ -460,6 +463,8 @@ class Simulation:
                         else:
                             self.store.set_soft(a, c, t)
         for (x, y), was in before.items():
+            if was and not self.store.mutual_more(x, y, t):
+                self.mutual_breaks.append((t, x, y))
             if not was and self.store.mutual_more(x, y, t):
                 self.mutual_events.append((t, x, y))
                 for z in (x, y):

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import math
 from collections import defaultdict
 from pathlib import Path
@@ -61,6 +62,7 @@ COLUMNS: dict[str, list[str]] = {
     ],
     "live-newcomer": [
         "newcomers_eligible",
+        "newcomer_early_sessions_with_anchor",
         "newcomer_within_horizon_share",
         "newcomer_sessions_to_mutual_median",
         "all_within_horizon_share",
@@ -120,10 +122,59 @@ COLUMNS: dict[str, list[str]] = {
     ],
     "async-newcomer": [
         "newcomers_eligible",
+        "newcomer_early_sessions_with_anchor",
         "newcomer_within_horizon_share",
         "newcomer_sessions_to_mutual_median",
         "all_within_horizon_share",
         "placed_share",
+    ],
+    "live-newcomer-batch": [
+        "newcomers_eligible",
+        "newcomer_early_sessions_with_anchor",
+        "newcomer_within_horizon_share",
+        "newcomer_sessions_to_mutual_median",
+        "all_within_horizon_share",
+        "wait_median_peak",
+    ],
+    "async-newcomer-batch": [
+        "newcomers_eligible",
+        "newcomer_early_sessions_with_anchor",
+        "newcomer_within_horizon_share",
+        "newcomer_sessions_to_mutual_median",
+        "all_within_horizon_share",
+        "placed_share",
+    ],
+    "live-more-weight": [
+        "wait_median_peak",
+        "reunion_14d_share",
+        "reunion_opportunity_hit_share",
+        "players_in_stable_cluster_share",
+        "mutual_pair_hours_per_week_p90",
+        "detect_auc",
+        "detect_auc_more",
+        "newcomer_within_horizon_share",
+    ],
+    "async-more-weight": [
+        "wait_median_peak",
+        "cosignup_reunion_share",
+        "reunion_14d_share",
+        "players_in_stable_cluster_share",
+        "mutual_pair_hours_per_week_p90",
+        "detect_auc",
+        "detect_auc_more",
+        "newcomer_within_horizon_share",
+    ],
+    "detection-placebo": [
+        "peak_online_median",
+        "detect_auc",
+        "detect_auc_more",
+        "reunion_14d_share",
+    ],
+    "async-detection-placebo": [
+        "peak_online_median",
+        "detect_auc",
+        "detect_auc_more",
+        "cosignup_reunion_share",
     ],
     "async-noise": [
         "peak_online_median",
@@ -225,14 +276,14 @@ def group_table(group: str, summary: list[dict[str, Any]]) -> str:
     rows = [r for r in summary if r["group"] == group]
     if not rows:
         return ""
-    params = [k for k in rows[0] if k.startswith("arm.")]
+    params = list(dict.fromkeys(k for r in rows for k in r if k.startswith("arm.")))
     metrics = COLUMNS.get(group, [])
     shape = GROUPS[group].shape
     crit = [c.key for c in (LIVE_CRITERIA if shape == "live" else ASYNC_CRITERIA)]
     head = [p.split(".", 2)[-1] for p in params] + [LABEL.get(m, m) for m in metrics] + crit
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     for r in rows:
-        cells = [_param(r[p]) for p in params]
+        cells = [_param(r[p]) if p in r else "base" for p in params]
         cells += [fmt(m, r.get(m), r.get(f"{m}_sd")) for m in metrics]
         cells += [r.get(c, "n/a") for c in crit]
         lines.append("| " + " | ".join(cells) + " |")
@@ -262,6 +313,30 @@ def lockout_table(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ):
         out.append({"N": n, "L": L, "samples": int(samples), "locked_share": locked / samples})
     return out
+
+
+def save_rows(rows: list[dict[str, Any]], out: Path) -> None:
+    """Raw rows as JSON lines, so a report can be rebuilt without rerunning (``report --from``)."""
+    out.mkdir(parents=True, exist_ok=True)
+    with (out / "runs.jsonl").open("w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, default=_json_default) + "\n")
+
+
+def load_rows(out: Path) -> list[dict[str, Any]]:
+    with (out / "runs.jsonl").open(encoding="utf-8") as f:
+        rows = [json.loads(line) for line in f if line.strip()]
+    for r in rows:  # JSON has no tuples; config tuples come back as lists
+        for k, v in r.items():
+            if isinstance(v, list) and k != "_lockout_by_n":
+                r[k] = tuple(v)
+    return rows
+
+
+def _json_default(v: Any) -> Any:
+    if isinstance(v, tuple):
+        return list(v)
+    raise TypeError(type(v))
 
 
 def write_outputs(rows: list[dict[str, Any]], out: Path, title: str) -> list[dict[str, Any]]:

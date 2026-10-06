@@ -64,7 +64,9 @@ def _player(pid, sessions=0, first=None, newcomer=False):
     )
 
 
-def _record(entries, sessions, players, mutual=(), first_cards=None, store=None, kind="live"):
+def _record(
+    entries, sessions, players, mutual=(), first_cards=None, store=None, kind="live", breaks=()
+):
     scn = live_baseline(weeks=4, burn_in_weeks=0)
     if kind == "async":
         scn = async_baseline(weeks=4, burn_in_weeks=0)
@@ -75,6 +77,7 @@ def _record(entries, sessions, players, mutual=(), first_cards=None, store=None,
         sessions=sessions,
         store=store or EdgeStore(30, 0.05, 5),
         mutual_events=list(mutual),
+        mutual_breaks=list(breaks),
         first_cards=first_cards or {},
         lockout=[],
         target_minutes_waiting=0.0,
@@ -160,5 +163,15 @@ def test_cosignup_reunion_by_hand():
         Entry(5, 2, 211.0, 299.0, (2,), True, window=2, placed_t=220.0, sid=4),
     ]
     rec = _record(entries, [], [_player(1), _player(2)], mutual=[(0.0, 1, 2)], kind="async")
-    # Window 0: same seed (hit). Window 1: no shared goal length (not a try). Window 2: missed.
+    # Window 0: same seed (hit). Window 1: different first choice (not a try). Window 2: missed.
     assert cosignup_reunion(rec) == 0.5
+    # If the pair stopped being mutual at t=150 (one marked the other avoid), window 2 is no try.
+    broken = _record(
+        entries,
+        [],
+        [_player(1), _player(2)],
+        mutual=[(0.0, 1, 2)],
+        kind="async",
+        breaks=[(150.0, 1, 2)],
+    )
+    assert cosignup_reunion(broken) == 1.0

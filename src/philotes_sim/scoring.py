@@ -106,6 +106,8 @@ def build_context(
             if e is None:
                 continue
             k = _key(i, j)
+            if e.kind in (HARD, SOFT) and not policy.honor_avoids:
+                continue  # placebo: the matcher behaves as if no avoid had been set
             if e.kind == HARD:
                 conflict[i].add(j)
                 conflict[j].add(i)
@@ -118,7 +120,8 @@ def build_context(
                 else:
                     conflict[i].add(j)
                     conflict[j].add(i)
-            elif e.kind == MORE and not store.avoids(b, a, now):  # §7.3: the other's avoid wins
+            elif e.kind == MORE and not (policy.honor_avoids and store.avoids(b, a, now)):
+                # §7.3: the other person's avoid wins over this `more`.
                 cp = store.coplay_of(a, b)
                 count = cp.count if cp else 0
                 since = (now - cp.last_t) / MINUTES_PER_DAY if cp else weights.reunion_days
@@ -127,7 +130,8 @@ def build_context(
                 pair_f[k] = pair_f.get(k, 0.0) + w
                 more_pairs.add(k)
                 more_in_pool[i] += 1
-                if store.valid_more(b, a, now):
+                back = store.get(b, a, now)
+                if back is not None and back.kind == MORE:
                     pair_f[k] += weights.mutual_bonus / 2.0  # counted once from each side
 
     if policy.anchors_enabled:

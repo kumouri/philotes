@@ -50,6 +50,7 @@ class Policy:
     newcomer_decay_sessions: int = 20  # boost reaches 0 after this many sessions; 0 = no boost
     anchors_enabled: bool = True  # R7 / §7.4
     composition_enabled: bool = True  # §7.3 "core + one or two"
+    honor_avoids: bool = True  # False only for the detection test's placebo run (validation)
     matcher: str = "heuristic"  # "heuristic" | "cpsat" | "hybrid" (CP-SAT when pool ≤ cpsat_max)
     cpsat_max_pool: int = 40
     cpsat_det_time: float = 5.0  # CP-SAT deterministic time budget per solve (reproducible)
