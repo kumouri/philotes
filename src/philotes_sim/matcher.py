@@ -152,6 +152,8 @@ def solve_heuristic(ctx: ScoringContext, policy: Policy) -> MatchResult:
                 lob = found
         lobbies.append(lob)
         free -= set(lob)
+    lobbies = _repair(ctx, lobbies, free, policy)
+    lobbies = _repack(ctx, lobbies, free, policy)
     lobbies = _local_search(ctx, lobbies, free, policy.local_search_passes)
     return MatchResult(
         lobbies=lobbies,
@@ -159,6 +161,147 @@ def solve_heuristic(ctx: ScoringContext, policy: Policy) -> MatchResult:
         method="heuristic",
         seconds=time.perf_counter() - t0,
     )
+
+
+def _form_from(
+    ctx: ScoringContext, pool: set[int], seeds: list[int], policy: Policy
+) -> list[int] | None:
+    """A feasible lobby from ``pool``, trying ``seeds`` in order, grown greedily once found."""
+    pref = sorted(pool, key=lambda c: (-ctx.player_w[c], c))
+    for s in seeds:
+        found, _ = find_lobby(s, pool, ctx.lo, ctx.hi, ctx.conflict, policy.dfs_node_limit, pref)
+        if found is not None:
+            grown = _grow(ctx, found, pool)
+            return grown if lobby_feasible(ctx, grown) else found
+    return None
+
+
+def _repair(
+    ctx: ScoringContext, lobbies: list[list[int]], free: set[int], policy: Policy
+) -> list[list[int]]:
+    """Packing repair: free up the player a leftover lobby is missing (§7.1 step 4).
+
+    Greedy growth can spend flexible players on one lobby and strand players whose ranges are
+    narrower (e.g. "exactly 4"). Two moves fix that, each accepted only if it places more people:
+
+    * swap-then-form: put leftover ``u`` into a lobby in place of member ``m``, then form a new
+      lobby from the leftovers plus ``m``;
+    * spare-then-form: take member ``m`` out of a lobby that stays feasible without them, and form
+      a new lobby from the leftovers plus ``m``.
+    """
+    changed = True
+    rounds = 0
+    while changed and free and rounds < 4 * (len(lobbies) + 1):
+        changed = False
+        rounds += 1
+        order = sorted(free, key=lambda c: (-ctx.seed_priority[c], c))
+        for k in range(len(lobbies)):
+            lob = lobbies[k]
+            for m in lob:
+                rest = [x for x in lob if x != m]
+                candidates: list[tuple[list[int], int | None]] = []
+                if lobby_feasible(ctx, rest):
+                    candidates.append((rest, None))
+                candidates += [([*rest, u], u) for u in order if lobby_feasible(ctx, [*rest, u])]
+                for new_lob, u in candidates:
+                    pool = (free - {u}) | {m} if u is not None else free | {m}
+                    formed = _form_from(ctx, pool, [m, *sorted(pool - {m})], policy)
+                    if formed is None:
+                        continue
+                    lobbies[k] = new_lob
+                    lobbies.append(formed)
+                    free.clear()
+                    free.update(pool - set(formed))
+                    changed = True
+                    break
+                if changed:
+                    break
+            if changed:
+                break
+    return lobbies
+
+
+def best_partition(
+    ctx: ScoringContext, pool: list[int], node_limit: int
+) -> tuple[list[list[int]], int]:
+    """Bounded exhaustive search for disjoint feasible lobbies in ``pool`` placing the most players.
+
+    Players are branched most-constrained first (narrowest size range, most conflicts); each is
+    either put in a feasible lobby with later players or left out. Returns (lobbies, placed).
+    """
+    order = sorted(pool, key=lambda i: (ctx.hi[i] - ctx.lo[i], -len(ctx.conflict[i]), i))
+    best: list[list[list[int]] | int] = [[], 0]
+    nodes = 0
+
+    def lobbies_with(p: int, rest: list[int]):
+        """All feasible lobbies containing ``p`` drawn from ``rest`` (generator)."""
+        cands = [c for c in rest if c not in ctx.conflict[p]]
+
+        def rec(members: list[int], start: int, lo: int, hi: int):
+            if lo <= len(members) <= hi:
+                yield list(members)
+            if len(members) >= hi:
+                return
+            for k in range(start, len(cands)):
+                c = cands[k]
+                if any(c in ctx.conflict[m] for m in members):
+                    continue
+                nlo, nhi = max(lo, ctx.lo[c]), min(hi, ctx.hi[c])
+                if nlo > nhi or len(members) + 1 > nhi:
+                    continue
+                members.append(c)
+                yield from rec(members, k + 1, nlo, nhi)
+                members.pop()
+
+        yield from rec([p], 0, ctx.lo[p], ctx.hi[p])
+
+    def rec(remaining: list[int], chosen: list[list[int]], placed: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > node_limit or placed + len(remaining) <= best[1]:
+            return
+        if not remaining:
+            best[0], best[1] = [list(x) for x in chosen], placed
+            return
+        p, rest = remaining[0], remaining[1:]
+        for lob in lobbies_with(p, rest):
+            taken = set(lob)
+            chosen.append(lob)
+            rec([r for r in rest if r not in taken], chosen, placed + len(lob))
+            chosen.pop()
+            if nodes > node_limit:
+                return
+        rec(rest, chosen, placed)  # leave p out
+
+    rec(order, [], 0)
+    return best[0], best[1]  # type: ignore[return-value]
+
+
+def _repack(
+    ctx: ScoringContext, lobbies: list[list[int]], free: set[int], policy: Policy
+) -> list[list[int]]:
+    """Re-partition one or two lobbies together with the leftovers when that places more people."""
+    limit = policy.repack_node_limit
+    changed = True
+    while changed and free:
+        changed = False
+        groups = [(k,) for k in range(len(lobbies))]
+        groups += [(a, b) for a in range(len(lobbies)) for b in range(a + 1, len(lobbies))]
+        for g in groups:
+            members = [x for k in g for x in lobbies[k]]
+            pool = sorted(set(members) | free)
+            if len(pool) > 20:
+                continue
+            parts, placed = best_partition(ctx, pool, limit)
+            if placed > len(members):
+                for k in sorted(g, reverse=True):
+                    del lobbies[k]
+                lobbies.extend(parts)
+                free.clear()
+                free.update(set(pool) - {x for lob in parts for x in lob})
+                changed = True
+                break
+    return lobbies
 
 
 def _local_search(

@@ -168,3 +168,37 @@ def test_heuristic_valid_with_wide_async_ranges(seed):
     base = random_ctx(seed, n=n)
     base.lo, base.hi = lo, hi
     assert_valid(base, solve_heuristic(base, POLICY).lobbies)
+
+
+def test_heuristic_does_not_strand_fixed_size_players():
+    """Captured from a real run: flexible players (3–5) spent on one lobby stranded three
+    exactly-4 players. Exact CP-SAT places all seven as 4 + 3; the heuristic must too."""
+    lo = [3, 4, 4, 3, 3, 3, 4]
+    hi = [5, 4, 4, 5, 5, 5, 4]
+    ctx = make_ctx(7, lo=lo, hi=hi, player_w=[1300, 1000, 1200, 1250, 1000, 1000, 1100])
+    res = solve_heuristic(ctx, POLICY)
+    assert_valid(ctx, res.lobbies)
+    assert sum(len(lob) for lob in res.lobbies) == 7
+    assert res.score == solve_cpsat(ctx, POLICY).score
+
+
+def test_best_partition_places_everyone_when_possible():
+    from philotes_sim.matcher import best_partition
+
+    # Four exactly-4 players and four flexible (3–5): 4 + 4 places all eight.
+    ctx = make_ctx(8, lo=[4, 4, 4, 4, 3, 3, 3, 3], hi=[4, 4, 4, 4, 5, 5, 5, 5])
+    parts, placed = best_partition(ctx, list(range(8)), node_limit=10_000)
+    assert placed == 8
+    assert_valid(ctx, parts)
+    # A block between two fixed players just splits them: still all eight.
+    lo, hi = [4, 4, 4, 4, 3, 3, 3, 3], [4, 4, 4, 4, 5, 5, 5, 5]
+    ctx = make_ctx(8, lo=lo, hi=hi, conflicts=[(0, 1)])
+    parts, placed = best_partition(ctx, list(range(8)), node_limit=10_000)
+    assert_valid(ctx, parts)
+    assert placed == 8
+    # Player 0 (exactly 4) is blocked with everyone but 1 and 2: 0 cannot play; the other 7 can.
+    ctx = make_ctx(8, lo=lo, hi=hi, conflicts=[(0, j) for j in range(3, 8)])
+    parts, placed = best_partition(ctx, list(range(8)), node_limit=10_000)
+    assert_valid(ctx, parts)
+    assert placed == 7
+    assert not any(0 in lob for lob in parts)

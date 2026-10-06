@@ -55,6 +55,7 @@ class Policy:
     cpsat_det_time: float = 5.0  # CP-SAT deterministic time budget per solve (reproducible)
     local_search_passes: int = 4
     dfs_node_limit: int = 4000
+    repack_node_limit: int = 30000  # bounded exhaustive re-partition of ≤ 20 players
 
 
 @dataclass(frozen=True)
