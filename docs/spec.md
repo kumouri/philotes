@@ -592,10 +592,14 @@ README). Where the build differs from the plan above:
 
 **Exit criteria.** The thresholds are Ceryce's call, informed by the first run. The suggestions below
 were written for live 4-player co-op in one region. Since the first niche is now async Archipelago
-(§14 #3), Phase 0 also needs async equivalents. **Proposed, not ruled:** criteria A1–A8 in
-[phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule), covering fill by
-window close, time to seed, preferred seed size, lockout, bottom-decile placement, newcomers,
-co-signup reunion and detection. Suggested starting points for 4-player co-op, one region:
+(§14 #3), Phase 0 also needs async equivalents. **Ruled 2026-10-06 (§14 #15): criteria A1–A8 in
+[phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule) are adopted, and
+seeds are formed in one batch when the sign-up window closes.** They cover fill by window close,
+time to seed, preferred seed size, lockout, bottom-decile placement, newcomers, co-signup reunion
+and detection. A2 (time to seed) applies only to a rolling cadence, so batching at close sets it
+aside. At batch-at-close, Phase 0 passes A1 and A3–A7 from a community of 50 (M = 50) up. **A8
+(detection) fails at every setting tried.** The ruled 7-day half-life gets closest (AUC 0.586 at
+M = 100 against a bar of 0.55; §7.6, §14 #9). Suggested starting points for 4-player co-op, one region:
 
 - Median peak wait under 10 minutes at `M` ≈ 200 with availability windows.
 - Hard-block lockout in under 1% of peak ticks at realistic avoid rates.
@@ -658,9 +662,9 @@ asks for them:
 | 12 | Should anchors also absorb high-avoid players? | **RULED 2026-10-05: lean taken.** No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
 | 13 | Minors | **RULED 2026-10-05: lean taken.** 18+ only. Revisit only with real age assurance and a separate design. | Ceryce |
 | 14 | Microsoft patent US 7,677,970 status | Confirm it has lapsed before Phase 1. | Ceryce (legal) |
-| 15 | Phase 0 exit thresholds | The §12 suggestions as the starting point. First run done: [phase0-results.md](phase0-results.md), including proposed async criteria. | Ceryce, after the first sim run |
+| 15 | Phase 0 exit thresholds | **RULED 2026-10-06: async criteria A1–A8 adopted, seeds batched once at window close** (Ceryce, "Adopt them, batch at window close"). A2 applies only to a rolling cadence. A8 (detection) is not met at any setting tried (§12). The live co-op criteria in §12 stay as the bar for the fallback niche. Data: [phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule). | Ceryce |
 | 16 | Banter/content-tolerance axis | **RULED 2026-10-05: lean taken.** Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
 | 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
 | 18 | Keep the newcomer boost and anchors? | **RULED 2026-10-06: drop both from v1** (Ceryce, "Drop both from v1"). Phase 0: no boost length beat off, and anchors fired but didn't measurably help newcomers ([phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off)). Revisit only if alpha shows newcomers struggling. §7.4 keeps the design. | Ceryce |
 
-"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. #9 and #18 were ruled 2026-10-06 shortly after midnight CT, from Phase 0 follow-up pickers over Telegram. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8 and #15 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
+"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. #9, #15 and #18 were ruled 2026-10-06 shortly after midnight CT, from Phase 0 follow-up pickers over Telegram. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
