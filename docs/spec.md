@@ -294,7 +294,8 @@ avoids end up matched only with each other.
 
 - **Newcomer / low-connectivity boost** (Proposed, Margo). Players with few `more` edges, or who
   are new, get a priority bonus to fill the "one or two" seats in cores. Lean: adopt, and decay it
-  over the first ~20 sessions.
+  over the first ~20 sessions. Ceryce is unsure of that length (2026-10-05), so Phase 0 sweeps
+  it (e.g. 5/10/20/40 sessions) against sessions-to-first-mutual-`more`, and she picks from the data.
 - **Anchors** (R7). Anchors are players who opt in to "put me with newcomers and strangers". The
   matcher prefers placing newcomers into lobbies with an anchor. Anchors get nothing visible for it.
   No badges, because a badge turns into a status game (lean). Anchors are for newcomers only and
@@ -621,7 +622,7 @@ asks for them:
 | 6 | **Hosting** | **RULED 2026-10-05: lean taken.** Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
 | 7 | Implementation language | **RULED 2026-10-05: lean taken.** Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
 | 8 | Hard-block cap | 5, then adjust using Phase 0 lockout data. | Ceryce, after Phase 0 |
-| 9 | Soft-avoid decay | Half-life ~30 days. Tune in Phase 0. | Engineering |
+| 9 | Soft-avoid decay | Half-life ~30 days. Tune in Phase 0. **2026-10-05: Ceryce is unsure of the length**, so Phase 0 sweeps it (e.g. 7/14/30/60/90 days) against lockout and reunion rates, and she picks from the data. | Ceryce, after Phase 0 |
 | 10 | Reveal mutual `more`? | **RULED 2026-10-05: lean taken.** Never. That is the dating-app mechanic. | Ceryce |
 | 11 | Implicit signals (co-queue, session length) | **RULED 2026-10-05: lean taken.** Not in v1. Explicit signals only. | Ceryce |
 | 12 | Should anchors also absorb high-avoid players? | **RULED 2026-10-05: lean taken.** No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
