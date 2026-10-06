@@ -26,6 +26,7 @@ from .sim import Simulation
 
 LIVE_WEEKS = 12  # 2 burn-in + 10 measured
 ASYNC_WEEKS = 26  # 4 burn-in + 22 measured sign-up windows
+LONG_WEEKS = 60  # half-life sweeps: a soft avoid expires after ~4.3 half-lives (90 d → 55 wk)
 CLOSE_ONLY = {"shape.cadence_hours": 168.0, "shape.ladder_minutes": "1e9,1e9,1e9"}
 
 
@@ -77,6 +78,7 @@ PHASE0: list[Group] = [
                 "population.M": [100, 200, 500],
             }
         ),
+        base={"weeks": LONG_WEEKS},  # long enough for 30–90-day avoids to expire
     ),
     Group(
         "live-cap",
@@ -123,6 +125,19 @@ PHASE0: list[Group] = [
         ),
     ),
     Group(
+        "live-search-half-life",
+        "live",
+        "Kill/rethink check, pass 2: best live-search sets, short avoid decay, 60-week horizon.",
+        _grid(
+            **{
+                "shape.habit": ["windows", "generous"],
+                "population.M": [350, 500],
+                "policy.soft_half_life_days": [7.0, 14.0],
+            }
+        ),
+        base={"population.flex_share": 1.0, "population.n_games": 1, "weeks": LONG_WEEKS},
+    ),
+    Group(
         "async-density",
         "async",
         "Async R3: time-to-seed and fill by M and matcher cadence (6 h, 24 h, batch at close).",
@@ -142,6 +157,7 @@ PHASE0: list[Group] = [
             for m in [50, 100]
             for c in ["6", "close"]
         ],
+        base={"weeks": LONG_WEEKS},
     ),
     Group(
         "async-cap",

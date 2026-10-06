@@ -104,6 +104,15 @@ COLUMNS: dict[str, list[str]] = {
         "detect_auc",
         "reunion_14d_share",
     ],
+    "live-search-half-life": [
+        "peak_online_median",
+        *COMMON_LIVE,
+        "match_rate_p10_over_median",
+        "newcomer_within_horizon_share",
+        "detect_auc",
+        "avoided_pair_rematch_share",
+        "soft_broken_per_100_sessions",
+    ],
     "async-half-life": [
         "locked_signup_share",
         "soft_broken_per_100_sessions",
