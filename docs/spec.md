@@ -132,7 +132,9 @@ A group that moves to its own Discord is the product working. It is not a retent
 > "Ooo anchors is a good one."
 
 Anchors are players who opt in to being matched with newcomers and strangers. They are in scope as
-a mechanism (§7.4), with details still open.
+a mechanism (§7.4), with details still open. **Not in v1** (ruled 2026-10-06, §14 #18): in Phase 0 they were
+placed with newcomers as designed but newcomers did no measurably better, so they wait until real
+alpha data shows a newcomer problem they could fix. This ruling stands for when they return.
 
 **R8. Weaponized avoidance is limited by arithmetic, and the arithmetic is local.**
 > "if ENOUGH users of a community avoided a player … it would be impossible to make a lobby their
@@ -178,7 +180,7 @@ The model is **a weighted graph of people, not groups.**
 
 - **Player**: an account. It holds the games the player is up for, the group sizes they accept per
   game, a coarse region/time zone, platform(s), optional *communication style* and *interests*, and
-  an optional **anchor** flag. Nothing about a player is browsable by anyone else.
+  an optional **anchor** flag (not in v1, ruled 2026-10-06, §14 #18). Nothing about a player is browsable by anyone else.
 - **Edge (a → b)**: a *directed* relationship that only `a` sets, only about someone `a` has
   actually played with (from "recently played with", R6). Each edge has one of three kinds:
   - `more`: "I like playing with this person, match me with them more often" (R2).
@@ -253,7 +255,7 @@ priority goes up.
   refreshed if re-applied). Overwatch's 7-day expiry is the shipped precedent.
 - `more` edges: positive weight (§7.3).
 - Comm-style and intensity compatibility: medium weight. Interest overlap: low weight.
-- Newcomer / low-connectivity boost and anchor placement (§7.4).
+- ~~Newcomer / low-connectivity boost and anchor placement (§7.4).~~ Dropped from v1 (ruled 2026-10-06, §14 #18).
 - Wait-time priority: this grows with time in window and is what eventually pays for breaking soft
   constraints.
 - Small random noise (§7.6).
@@ -292,12 +294,18 @@ audit. Implicit signals can be revisited after v1.
 The risk (R5): a pure affinity objective pulls well-liked players together, and players with many
 avoids end up matched only with each other.
 
-- **Newcomer / low-connectivity boost** (Proposed, Margo). Players with few `more` edges, or who
+**Ruled 2026-10-06 (§14 #18): the newcomer boost and anchors are both dropped from v1.** Phase 0
+found that no boost length beat having it off, and that anchors were placed with newcomers but
+newcomers did no measurably better. Newcomers still reach groups through the "core + one or two"
+composition bonus (§7.3). The two bullets below are kept as the design to revisit if alpha shows
+newcomers struggling.
+
+- **Newcomer / low-connectivity boost** (Proposed, Margo; not in v1). Players with few `more` edges, or who
   are new, get a priority bonus to fill the "one or two" seats in cores. Lean: adopt, and decay it
   over the first ~20 sessions. Ceryce is unsure of that length (2026-10-05), so Phase 0 sweeps
   it (e.g. 5/10/20/40 sessions) against sessions-to-first-mutual-`more`, and she picks from the data.
   Phase 0 data: [phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off).
-- **Anchors** (R7). Anchors are players who opt in to "put me with newcomers and strangers". The
+- **Anchors** (R7; not in v1). Anchors are players who opt in to "put me with newcomers and strangers". The
   matcher prefers placing newcomers into lobbies with an anchor. Anchors get nothing visible for it.
   No badges, because a badge turns into a status game (lean). Anchors are for newcomers only and
   are never asked to host lobbies of players with high avoid counts (ruled 2026-10-05, §14 #12).
@@ -507,7 +515,7 @@ also the main risk.
   what moderators can do.
 - **Ban evasion.** Identity is a Discord account. Alt accounts are a known limit. Lean mitigation: a
   minimum Discord account age and membership in the host server.
-- **Anchor wellbeing.** Anchors can opt out instantly and silently. They aren't asked to absorb
+- **Anchor wellbeing** (applies if anchors return after v1, §14 #18). Anchors can opt out instantly and silently. They aren't asked to absorb
   difficult players (ruled 2026-10-05, §14 #12).
 - **No paywalled safety.** Blocking, avoiding and reporting are never paid features. Dota's
   paywalled avoid list is the counter-example.
@@ -647,5 +655,6 @@ asks for them:
 | 15 | Phase 0 exit thresholds | The §12 suggestions as the starting point. First run done: [phase0-results.md](phase0-results.md), including proposed async criteria. | Ceryce, after the first sim run |
 | 16 | Banter/content-tolerance axis | **RULED 2026-10-05: lean taken.** Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
 | 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
+| 18 | Keep the newcomer boost and anchors? | **RULED 2026-10-06: drop both from v1** (Ceryce, "Drop both from v1"). Phase 0: no boost length beat off, and anchors fired but didn't measurably help newcomers ([phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off)). Revisit only if alpha shows newcomers struggling. §7.4 keeps the design. | Ceryce |
 
-"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8, #9 and #15 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
+"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. #18 was ruled 2026-10-06 shortly after midnight CT, from a Phase 0 follow-up picker over Telegram. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8, #9 and #15 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
