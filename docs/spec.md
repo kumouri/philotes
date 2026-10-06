@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Specced, unbuilt.** No code, users or hosting yet. |
+| **Status** | **Phase 0 simulator built** ([`src/philotes_sim/`](../src/philotes_sim/), first results in [`phase0-results.md`](phase0-results.md)). Nothing user-facing, no users or hosting yet. |
 | **Spec version** | v0.1, 2026-09-24 (first draft) |
 | **Owner / decider** | Ceryce |
 | **Canonical source** | This file. Other formats are rendered from it. |
@@ -296,6 +296,7 @@ avoids end up matched only with each other.
   are new, get a priority bonus to fill the "one or two" seats in cores. Lean: adopt, and decay it
   over the first ~20 sessions. Ceryce is unsure of that length (2026-10-05), so Phase 0 sweeps
   it (e.g. 5/10/20/40 sessions) against sessions-to-first-mutual-`more`, and she picks from the data.
+  Phase 0 data: [phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off).
 - **Anchors** (R7). Anchors are players who opt in to "put me with newcomers and strangers". The
   matcher prefers placing newcomers into lobbies with an anchor. Anchors get nothing visible for it.
   No badges, because a badge turns into a status game (lean). Anchors are for newcomers only and
@@ -338,7 +339,9 @@ The risk (R5): `b` works out that `a` avoided them.
 - **Noise in matching** (Proposed, Margo). A small random term means a missing reunion looks the
   same as bad timing. Lean: adopt, and tune it in Phase 0 against a *detection test*. That test
   asks whether a statistically motivated `b` could tell "a avoided me" apart from "a and I were
-  unlucky" at realistic pool sizes.
+  unlucky" at realistic pool sizes. **Phase 0 result (2026-10-05):** noise did not move the test
+  at any level tried; pool size and a shorter soft-avoid half-life did
+  ([phase0-results.md](phase0-results.md#r5-silent-rejection-the-detection-test)).
 - **Edges are never revealed.** That covers `more`, `avoid` and mutual `more` alike. There is no
   "they liked you too!", because that is the dating-app mechanic R1 rejects (ruled 2026-10-05, §14 #10).
 - **Honest limit.** In a tiny pool, such as a niche game where the same six people are always
@@ -561,11 +564,24 @@ numbers decide whether Phase 1 is worth building in the shape described here.
 | Newcomers / anchors | Sessions until a newcomer's first mutual `more`, with and without the boost and anchors. |
 | R5 silent rejection | **Detection test:** how well can a motivated player's own match history tell whether a specific person avoided them, by pool size and noise level? |
 
+**As built** (2026-10-05, [`src/philotes_sim/`](../src/philotes_sim/); how to run it is in the
+README). Where the build differs from the plan above:
+
+- Both pool shapes are simulated: the live co-op queue and the async Archipelago weekly sign-up
+  window (matcher every few hours, or once at close).
+- Matcher v0 is the §7.1 heuristic plus two packing-repair moves (needed to stay within ~1% of the
+  exact optimum), with exact CP-SAT as the baseline and an optional hybrid for pools of 40 or fewer.
+- The §7.5 ladder models steps 3 (size), 4 (other listed games) and 6 (break soft avoids). Steps 2
+  and 5 aren't modelled, because the sim is one region and one community.
+- The detection test is an AUC over first-time co-player pairs; the
+  [results doc](phase0-results.md#r5-silent-rejection-the-detection-test) defines it.
+
 **Exit criteria.** The thresholds are Ceryce's call, informed by the first run. The suggestions below
 were written for live 4-player co-op in one region. Since the first niche is now async Archipelago
-(§14 #3), Phase 0 also needs async equivalents, such as time for a seed to fill within a weekly
-sign-up window instead of peak queue wait. Those are still to be written. Suggested starting points
-for 4-player co-op, one region:
+(§14 #3), Phase 0 also needs async equivalents. **Proposed, not ruled:** criteria A1–A8 in
+[phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule), covering fill by
+window close, time to seed, preferred seed size, lockout, bottom-decile placement, newcomers,
+co-signup reunion and detection. Suggested starting points for 4-player co-op, one region:
 
 - Median peak wait under 10 minutes at `M` ≈ 200 with availability windows.
 - Hard-block lockout in under 1% of peak ticks at realistic avoid rates.
@@ -621,14 +637,14 @@ asks for them:
 | 5 | **Monetization, or none** | **RULED 2026-10-05: lean taken.** None. Donations to cover hosting at most, and never paywalled safety (§13). | Ceryce |
 | 6 | **Hosting** | **RULED 2026-10-05: lean taken.** Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
 | 7 | Implementation language | **RULED 2026-10-05: lean taken.** Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
-| 8 | Hard-block cap | 5, then adjust using Phase 0 lockout data. | Ceryce, after Phase 0 |
-| 9 | Soft-avoid decay | Half-life ~30 days. Tune in Phase 0. **2026-10-05: Ceryce is unsure of the length**, so Phase 0 sweeps it (e.g. 7/14/30/60/90 days) against lockout and reunion rates, and she picks from the data. | Ceryce, after Phase 0 |
+| 8 | Hard-block cap | 5, then adjust using Phase 0 lockout data. Phase 0 data: [phase0-results.md](phase0-results.md#hard-block-cap-14-8-1--3--5--10--25). | Ceryce, after Phase 0 |
+| 9 | Soft-avoid decay | Half-life ~30 days. Tune in Phase 0. **2026-10-05: Ceryce is unsure of the length**, so Phase 0 sweeps it (e.g. 7/14/30/60/90 days) against lockout and reunion rates, and she picks from the data. Phase 0 data: [phase0-results.md](phase0-results.md#soft-avoid-half-life-14-9-7--14--30--60--90-days). | Ceryce, after Phase 0 |
 | 10 | Reveal mutual `more`? | **RULED 2026-10-05: lean taken.** Never. That is the dating-app mechanic. | Ceryce |
 | 11 | Implicit signals (co-queue, session length) | **RULED 2026-10-05: lean taken.** Not in v1. Explicit signals only. | Ceryce |
 | 12 | Should anchors also absorb high-avoid players? | **RULED 2026-10-05: lean taken.** No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
 | 13 | Minors | **RULED 2026-10-05: lean taken.** 18+ only. Revisit only with real age assurance and a separate design. | Ceryce |
 | 14 | Microsoft patent US 7,677,970 status | Confirm it has lapsed before Phase 1. | Ceryce (legal) |
-| 15 | Phase 0 exit thresholds | The §12 suggestions as the starting point. | Ceryce, after the first sim run |
+| 15 | Phase 0 exit thresholds | The §12 suggestions as the starting point. First run done: [phase0-results.md](phase0-results.md), including proposed async criteria. | Ceryce, after the first sim run |
 | 16 | Banter/content-tolerance axis | **RULED 2026-10-05: lean taken.** Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
 | 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
 
