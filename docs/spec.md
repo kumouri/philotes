@@ -132,7 +132,9 @@ A group that moves to its own Discord is the product working. It is not a retent
 > "Ooo anchors is a good one."
 
 Anchors are players who opt in to being matched with newcomers and strangers. They are in scope as
-a mechanism (§7.4), with details still open.
+a mechanism (§7.4), with details still open. **Not in v1** (ruled 2026-10-06, §14 #18): in Phase 0 they were
+placed with newcomers as designed but newcomers did no measurably better, so they wait until real
+alpha data shows a newcomer problem they could fix. This ruling stands for when they return.
 
 **R8. Weaponized avoidance is limited by arithmetic, and the arithmetic is local.**
 > "if ENOUGH users of a community avoided a player … it would be impossible to make a lobby their
@@ -178,7 +180,7 @@ The model is **a weighted graph of people, not groups.**
 
 - **Player**: an account. It holds the games the player is up for, the group sizes they accept per
   game, a coarse region/time zone, platform(s), optional *communication style* and *interests*, and
-  an optional **anchor** flag. Nothing about a player is browsable by anyone else.
+  an optional **anchor** flag (not in v1, ruled 2026-10-06, §14 #18). Nothing about a player is browsable by anyone else.
 - **Edge (a → b)**: a *directed* relationship that only `a` sets, only about someone `a` has
   actually played with (from "recently played with", R6). Each edge has one of three kinds:
   - `more`: "I like playing with this person, match me with them more often" (R2).
@@ -249,11 +251,12 @@ priority goes up.
 
 **Soft. These are weighted and can be broken when the pool is thin.**
 
-- `avoid-soft` edges: a large negative weight that **decays** (lean: half-life around 30 days,
-  refreshed if re-applied). Overwatch's 7-day expiry is the shipped precedent.
+- `avoid-soft` edges: a large negative weight that **decays**, with a **half-life of ~7 days**,
+  refreshed if re-applied (ruled 2026-10-06, §14 #9). Overwatch's 7-day expiry is the shipped
+  precedent. A player who wants someone gone for good uses a hard block, which does not decay.
 - `more` edges: positive weight (§7.3).
 - Comm-style and intensity compatibility: medium weight. Interest overlap: low weight.
-- Newcomer / low-connectivity boost and anchor placement (§7.4).
+- ~~Newcomer / low-connectivity boost and anchor placement (§7.4).~~ Dropped from v1 (ruled 2026-10-06, §14 #18).
 - Wait-time priority: this grows with time in window and is what eventually pays for breaking soft
   constraints.
 - Small random noise (§7.6).
@@ -292,12 +295,18 @@ audit. Implicit signals can be revisited after v1.
 The risk (R5): a pure affinity objective pulls well-liked players together, and players with many
 avoids end up matched only with each other.
 
-- **Newcomer / low-connectivity boost** (Proposed, Margo). Players with few `more` edges, or who
+**Ruled 2026-10-06 (§14 #18): the newcomer boost and anchors are both dropped from v1.** Phase 0
+found that no boost length beat having it off, and that anchors were placed with newcomers but
+newcomers did no measurably better. Newcomers still reach groups through the "core + one or two"
+composition bonus (§7.3). The two bullets below are kept as the design to revisit if alpha shows
+newcomers struggling.
+
+- **Newcomer / low-connectivity boost** (Proposed, Margo; not in v1). Players with few `more` edges, or who
   are new, get a priority bonus to fill the "one or two" seats in cores. Lean: adopt, and decay it
   over the first ~20 sessions. Ceryce is unsure of that length (2026-10-05), so Phase 0 sweeps
   it (e.g. 5/10/20/40 sessions) against sessions-to-first-mutual-`more`, and she picks from the data.
   Phase 0 data: [phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off).
-- **Anchors** (R7). Anchors are players who opt in to "put me with newcomers and strangers". The
+- **Anchors** (R7; not in v1). Anchors are players who opt in to "put me with newcomers and strangers". The
   matcher prefers placing newcomers into lobbies with an anchor. Anchors get nothing visible for it.
   No badges, because a badge turns into a status game (lean). Anchors are for newcomers only and
   are never asked to host lobbies of players with high avoid counts (ruled 2026-10-05, §14 #12).
@@ -344,6 +353,11 @@ The risk (R5): `b` works out that `a` avoided them.
   ([phase0-results.md](phase0-results.md#r5-silent-rejection-the-detection-test)).
 - **Edges are never revealed.** That covers `more`, `avoid` and mutual `more` alike. There is no
   "they liked you too!", because that is the dating-app mechanic R1 rejects (ruled 2026-10-05, §14 #10).
+- **Short soft-avoid half-life** (ruled 2026-10-06, §14 #9). Phase 0 showed the leak comes from
+  honouring avoids at all, so noise can't close it. Ceryce chose to shrink it with a ~7-day
+  half-life (async detection AUC 0.586, the lowest tried, vs 0.670 at 30 days). The accepted cost:
+  about 31% of avoided pairs end up matched again, against 12% at 30 days. Hard blocks are
+  unaffected and remain the tool for "never again".
 - **Honest limit.** In a tiny pool, such as a niche game where the same six people are always
   online, no amount of noise hides a consistent absence. R5 accepts this. The spec does not claim
   otherwise.
@@ -507,7 +521,7 @@ also the main risk.
   what moderators can do.
 - **Ban evasion.** Identity is a Discord account. Alt accounts are a known limit. Lean mitigation: a
   minimum Discord account age and membership in the host server.
-- **Anchor wellbeing.** Anchors can opt out instantly and silently. They aren't asked to absorb
+- **Anchor wellbeing** (applies if anchors return after v1, §14 #18). Anchors can opt out instantly and silently. They aren't asked to absorb
   difficult players (ruled 2026-10-05, §14 #12).
 - **No paywalled safety.** Blocking, avoiding and reporting are never paid features. Dota's
   paywalled avoid list is the counter-example.
@@ -578,10 +592,14 @@ README). Where the build differs from the plan above:
 
 **Exit criteria.** The thresholds are Ceryce's call, informed by the first run. The suggestions below
 were written for live 4-player co-op in one region. Since the first niche is now async Archipelago
-(§14 #3), Phase 0 also needs async equivalents. **Proposed, not ruled:** criteria A1–A8 in
-[phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule), covering fill by
-window close, time to seed, preferred seed size, lockout, bottom-decile placement, newcomers,
-co-signup reunion and detection. Suggested starting points for 4-player co-op, one region:
+(§14 #3), Phase 0 also needs async equivalents. **Ruled 2026-10-06 (§14 #15): criteria A1–A8 in
+[phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule) are adopted, and
+seeds are formed in one batch when the sign-up window closes.** They cover fill by window close,
+time to seed, preferred seed size, lockout, bottom-decile placement, newcomers, co-signup reunion
+and detection. A2 (time to seed) applies only to a rolling cadence, so batching at close sets it
+aside. At batch-at-close, Phase 0 passes A1 and A3–A7 from a community of 50 (M = 50) up. **A8
+(detection) fails at every setting tried.** The ruled 7-day half-life gets closest (AUC 0.586 at
+M = 100 against a bar of 0.55; §7.6, §14 #9). Suggested starting points for 4-player co-op, one region:
 
 - Median peak wait under 10 minutes at `M` ≈ 200 with availability windows.
 - Hard-block lockout in under 1% of peak ticks at realistic avoid rates.
@@ -638,14 +656,15 @@ asks for them:
 | 6 | **Hosting** | **RULED 2026-10-05: lean taken.** Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
 | 7 | Implementation language | **RULED 2026-10-05: lean taken.** Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
 | 8 | Hard-block cap | 5, then adjust using Phase 0 lockout data. Phase 0 data: [phase0-results.md](phase0-results.md#hard-block-cap-14-8-1--3--5--10--25). | Ceryce, after Phase 0 |
-| 9 | Soft-avoid decay | Half-life ~30 days. Tune in Phase 0. **2026-10-05: Ceryce is unsure of the length**, so Phase 0 sweeps it (e.g. 7/14/30/60/90 days) against lockout and reunion rates, and she picks from the data. Phase 0 data: [phase0-results.md](phase0-results.md#soft-avoid-half-life-14-9-7--14--30--60--90-days). | Ceryce, after Phase 0 |
+| 9 | Soft-avoid decay | **RULED 2026-10-06: half-life ~7 days** (Ceryce, "Short avoid half-life (~7 days)"), chosen to make silent rejection hardest to detect (§7.6). Phase 0: half-life doesn't move hard lockout; 7 days gives the lowest detection AUC and the most re-matches with avoided people (async 31%). Phase 0 data: [phase0-results.md](phase0-results.md#soft-avoid-half-life-14-9-7--14--30--60--90-days). | Ceryce |
 | 10 | Reveal mutual `more`? | **RULED 2026-10-05: lean taken.** Never. That is the dating-app mechanic. | Ceryce |
 | 11 | Implicit signals (co-queue, session length) | **RULED 2026-10-05: lean taken.** Not in v1. Explicit signals only. | Ceryce |
 | 12 | Should anchors also absorb high-avoid players? | **RULED 2026-10-05: lean taken.** No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
 | 13 | Minors | **RULED 2026-10-05: lean taken.** 18+ only. Revisit only with real age assurance and a separate design. | Ceryce |
 | 14 | Microsoft patent US 7,677,970 status | Confirm it has lapsed before Phase 1. | Ceryce (legal) |
-| 15 | Phase 0 exit thresholds | The §12 suggestions as the starting point. First run done: [phase0-results.md](phase0-results.md), including proposed async criteria. | Ceryce, after the first sim run |
+| 15 | Phase 0 exit thresholds | **RULED 2026-10-06: async criteria A1–A8 adopted, seeds batched once at window close** (Ceryce, "Adopt them, batch at window close"). A2 applies only to a rolling cadence. A8 (detection) is not met at any setting tried (§12). The live co-op criteria in §12 stay as the bar for the fallback niche. Data: [phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule). | Ceryce |
 | 16 | Banter/content-tolerance axis | **RULED 2026-10-05: lean taken.** Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
 | 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
+| 18 | Keep the newcomer boost and anchors? | **RULED 2026-10-06: drop both from v1** (Ceryce, "Drop both from v1"). Phase 0: no boost length beat off, and anchors fired but didn't measurably help newcomers ([phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off)). Revisit only if alpha shows newcomers struggling. §7.4 keeps the design. | Ceryce |
 
-"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8, #9 and #15 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
+"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. #9, #15 and #18 were ruled 2026-10-06 shortly after midnight CT, from Phase 0 follow-up pickers over Telegram. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
