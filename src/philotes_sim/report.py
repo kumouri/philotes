@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from .experiments import ASYNC_CRITERIA, GROUPS, LIVE_CRITERIA, check
+from .experiments import A8_BAR, ASYNC_CRITERIA, GROUPS, LIVE_CRITERIA, check
 
 COMMON_LIVE = ["wait_median_peak", "placed_share_peak", "lockout_tick_share"]
 COMMON_ASYNC = ["wait_median_peak", "placed_share", "locked_signup_share"]
@@ -232,6 +232,7 @@ def summarise(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for (group, arm), rs in sorted(by_arm.items()):
         row: dict[str, Any] = {"group": group, "arm": arm, "replicates": len(rs)}
+        row["population.M"] = rs[0].get("population.M")  # A8 is scoped by community size
         for k, v in rs[0].items():
             if k.startswith("arm."):
                 row[k] = v
@@ -361,7 +362,8 @@ def write_outputs(rows: list[dict[str, Any]], out: Path, title: str) -> list[dic
     md.append(
         "Means over replicates (± sd). Waits: minutes (live) or hours (async). "
         "Criteria columns check the arm's mean against the §12 live suggestions (C1–C5) or the "
-        "proposed async criteria (A1–A8); n/a means the criterion does not apply at that size."
+        "ruled async criteria (A1–A8); n/a means the criterion does not apply at that size. "
+        f"A8 applies the ruled bar (§14 #15): {A8_BAR}, n/a below M = {A8_BAR.min_M}."
     )
     md.append("")
     for g in groups:

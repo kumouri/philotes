@@ -11,7 +11,7 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import Any
 
 from .config import Policy, async_baseline, live_baseline, with_overrides
-from .experiments import CLOSE_ONLY
+from .experiments import CLOSE_ONLY, PHASE0_HARD_CAP
 from .matcher import solve_cpsat, solve_heuristic
 from .scoring import ScoringContext
 from .sim import Simulation
@@ -32,7 +32,8 @@ def _capture(job: tuple[int, int]) -> list[tuple[int, ScoringContext]]:
     src, per_source = job
     _, overrides, shape = SOURCES[src]
     base = live_baseline(weeks=4) if shape == "live" else async_baseline(weeks=10)
-    rec = Simulation(with_overrides(base, overrides), capture_contexts=10**6).run()
+    scn = with_overrides(base, {**PHASE0_HARD_CAP, **overrides})
+    rec = Simulation(scn, capture_contexts=10**6).run()
     pools = [c for c in rec.contexts if 6 <= c.n <= 40]
     step = max(1, len(pools) // per_source)
     return [(src, c) for c in pools[::step][:per_source]]

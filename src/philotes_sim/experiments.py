@@ -4,9 +4,11 @@ Each sweep group varies a few knobs around a baseline and runs every arm under t
 seeds (common random numbers: the population and schedules are identical across arms, so a
 difference between arms is the knob, not the draw).
 
-``LIVE_CRITERIA`` are the §12 suggestions for live 4-player co-op. ``ASYNC_CRITERIA`` are
-**proposed** here for async Archipelago (§12 says they are still to be written); they are Ceryce's
-to rule on. Both were fixed before the first full sweep was run.
+``LIVE_CRITERIA`` are the §12 suggestions for live 4-player co-op. ``ASYNC_CRITERIA`` were
+proposed here for async Archipelago and fixed before the first full sweep was run; Ceryce adopted
+them (§12, §14 #15). The one change since that sweep is A8, now judged against the ruled bar in
+``A8_BAR`` rather than "within 0.05 of 0.5", so a fresh report differs from the dated
+docs/phase0-results.md in its A8 column.
 """
 
 from __future__ import annotations
@@ -28,6 +30,9 @@ LIVE_WEEKS = 12  # 2 burn-in + 10 measured
 ASYNC_WEEKS = 26  # 4 burn-in + 22 measured sign-up windows
 LONG_WEEKS = 60  # half-life sweeps: a soft avoid expires after ~4.3 half-lives (90 d → 55 wk)
 CLOSE_ONLY = {"shape.cadence_hours": 168.0, "shape.ladder_minutes": "1e9,1e9,1e9"}
+# The Phase 0 sweep ran at the then-lean cap of 5. Pinned so the committed results still reproduce
+# now that the ruled default is 10 (§14 #8); the cap groups override it per arm.
+PHASE0_HARD_CAP = {"policy.hard_cap": 5}
 
 
 @dataclass(frozen=True)
@@ -277,7 +282,7 @@ def scenario_for(group: Group, arm: dict[str, Any], seed: int) -> Scenario:
         if group.shape == "live"
         else async_baseline(weeks=ASYNC_WEEKS)
     )
-    scn = with_overrides(base, {**(group.base or {}), **arm})
+    scn = with_overrides(base, {**PHASE0_HARD_CAP, **(group.base or {}), **arm})
     return with_overrides(scn, {"seed": seed, "name": group.name})
 
 
@@ -295,6 +300,23 @@ class Criterion:
 
 def _near_chance(x: float) -> bool:
     return not math.isnan(x) and abs(x - 0.5) <= 0.05
+
+
+@dataclass(frozen=True)
+class AucBar:
+    """A detection bar: mean AUC at most ``max_auc``, judged only at community size ``min_M`` up."""
+
+    max_auc: float
+    min_M: int
+
+    def __str__(self) -> str:
+        return f"detection AUC ≤ {self.max_auc:.2f} at M ≥ {self.min_M}"
+
+
+# A8 as ruled 2026-10-06 (§12, §14 #15): the honest limit. Measured 0.586 at M = 100, batch at
+# close, 7-day half-life; M = 50 measured 0.600 with no headroom, so the bar starts at M = 100 and
+# smaller communities are not judged (n/a). The spec names this constant; change the bar only here.
+A8_BAR = AucBar(max_auc=0.60, min_M=100)
 
 
 LIVE_CRITERIA = [
@@ -323,7 +345,7 @@ LIVE_CRITERIA = [
     ),
 ]
 
-ASYNC_CRITERIA = [  # PROPOSED for Ceryce to rule on (§12, §14 #15).
+ASYNC_CRITERIA = [  # Adopted 2026-10-06 (§12, §14 #15).
     Criterion(
         "A1",
         "≥ 90% of sign-ups placed in a seed by window close",
@@ -363,10 +385,10 @@ ASYNC_CRITERIA = [  # PROPOSED for Ceryce to rule on (§12, §14 #15).
     ),
     Criterion(
         "A8",
-        "detection advantage near chance at ≥ 20 sign-ups per window",
+        str(A8_BAR),
         "detect_auc",
-        _near_chance,
-        applies=lambda m: m.get("peak_online_median", 0) >= 20,
+        lambda x: x <= A8_BAR.max_auc,
+        applies=lambda m: (m.get("population.M") or 0) >= A8_BAR.min_M,
     ),
 ]
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Phase 0 simulator built** ([`src/philotes_sim/`](../src/philotes_sim/), first results in [`phase0-results.md`](phase0-results.md)). Nothing user-facing, no users or hosting yet. |
+| **Status** | **Phase 0 exit criteria met** under the ruled async shape (batch at window close, 7-day soft-avoid half-life, A8 at the honest limit; §12, §14 #15). Simulator in [`src/philotes_sim/`](../src/philotes_sim/), results in [`phase0-results.md`](phase0-results.md). **Phase 1 is unblocked apart from §14 #14** (patent check). Nothing user-facing, no users or hosting yet. |
 | **Spec version** | v0.1, 2026-09-24 (first draft) |
 | **Owner / decider** | Ceryce |
 | **Canonical source** | This file. Other formats are rendered from it. |
@@ -243,9 +243,9 @@ priority goes up.
 - Same game, and a lobby size inside *every* member's accepted range.
 - Platform / cross-play compatibility, and a region or latency bound where the game needs one.
 - **Hard blocks.** If `a` has `avoid-hard` on `b`, then `a` and `b` are never in the same lobby.
-  (Proposed, Margo.) Lean: **5 per player**, which lines up with Overwatch's 3 pinned and Dota's
-  paywalled 25. They don't decay. Because of the cap, a player can't use hard blocks to exclude a
-  meaningful share of a pool (see §8).
+  (Proposed, Margo.) **10 per player** (ruled 2026-10-06, §14 #8), between Overwatch's 3 pinned and
+  Dota's paywalled 25. They don't decay. Because of the cap, a player can't use hard blocks to
+  exclude a meaningful share of a pool (see §8).
 - Age band separation (§10).
 - Mandatory filters the player sets on themselves, such as "voice required".
 
@@ -358,9 +358,13 @@ The risk (R5): `b` works out that `a` avoided them.
   half-life (async detection AUC 0.586, the lowest tried, vs 0.670 at 30 days). The accepted cost:
   about 31% of avoided pairs end up matched again, against 12% at 30 days. Hard blocks are
   unaffected and remain the tool for "never again".
-- **Honest limit.** In a tiny pool, such as a niche game where the same six people are always
-  online, no amount of noise hides a consistent absence. R5 accepts this. The spec does not claim
-  otherwise.
+- **Honest limit** (ruled 2026-10-06, §14 #15). In a tiny pool, such as a niche game where the
+  same six people are always online, no amount of noise hides a consistent absence. R5 accepts
+  this. The spec does not claim otherwise. Phase 0 found the same in async at every size tried,
+  because the pool is the same few dozen people each week. Ceryce chose "Accept the honest limit"
+  over softening what an avoid does: A8's bar is set to what the 7-day half-life achieves (§12),
+  and R4 stays intact. The cost is that **a determined person can partly infer an avoid**, and the
+  product says so plainly (Phase 1, §12).
 
 ## 8. Weaponized avoidance: the lockout arithmetic
 
@@ -395,9 +399,17 @@ What follows from the table:
    encourage size *ranges* in the UI.
 4. **Soft avoids cannot lock anyone out indefinitely.** The relaxation ladder (§7.5) breaks soft
    avoids once wait-time priority is high enough, so a mass *soft* avoid delays `P` and nothing
-   more. Only **hard** blocks can lock someone out. Hard blocks are capped (lean: 5 per player), so
-   a lockout needs `N − L + 1` distinct people to each spend a scarce slot on `P` and be queued at
-   the same moment.
+   more. Only **hard** blocks can lock someone out. Hard blocks are capped (10 per player, ruled
+   2026-10-06, §14 #8), so a lockout needs `N − L + 1` distinct people to each spend a scarce slot
+   on `P` and be queued at the same moment. The cap is a trade between room to block and lockout.
+   In Phase 0, at the default rate, the cap made no difference above 3: players averaged under one
+   hard block in 12 weeks. If people
+   hard-block readily, a higher cap costs lockout: 10 instead of 5 took live peak-tick lockout from
+   4.8% to 5.3% when 20% of avoids were hard, and from 7.0% to 9.1% at 40%
+   ([phase0-results.md](phase0-results.md#hard-block-cap-14-8-1--3--5--10--25)). Ceryce chose 10
+   to give more room to people who need many blocks. No cap stops a coordinated clique, since each
+   member spends only one slot. Pool size and the coordinated-blocking review below are what
+   protect the target.
 
 **Who pays for an avoid?** Lean (derived from the "an avoid only affects the avoider's matches"
 principle): when the matcher must choose between making the avoider wait and making the avoided
@@ -508,7 +520,7 @@ also the main risk.
   (§14).
 - **Avoid ≠ report.** An avoid is a *preference*: private, unreviewed, affecting only the avoider.
   A report is an *allegation*: it goes to humans. Lean: filing a report also applies a hard block
-  *outside* the 5-slot cap. Abusive reporting is itself something moderators can act on.
+  *outside* the 10-slot cap. Abusive reporting is itself something moderators can act on.
 - **Human review, not automated verdicts.** Moderators act on reports. Mass avoidance only matters
   alongside reports (§8). There's no hidden reputation score, no shadow-banning, and no automated
   penalty to matching priority.
@@ -597,9 +609,21 @@ were written for live 4-player co-op in one region. Since the first niche is now
 seeds are formed in one batch when the sign-up window closes.** They cover fill by window close,
 time to seed, preferred seed size, lockout, bottom-decile placement, newcomers, co-signup reunion
 and detection. A2 (time to seed) applies only to a rolling cadence, so batching at close sets it
-aside. At batch-at-close, Phase 0 passes A1 and A3–A7 from a community of 50 (M = 50) up. **A8
-(detection) fails at every setting tried.** The ruled 7-day half-life gets closest (AUC 0.586 at
-M = 100 against a bar of 0.55; §7.6, §14 #9). Suggested starting points for 4-player co-op, one region:
+aside. At batch-at-close, Phase 0 passes A1 and A3–A7 from a community of 50 (M = 50) up. A8
+(detection) as first written, AUC within 0.05 of 0.5, failed at every setting tried. The ruled
+7-day half-life got closest (AUC 0.586 at M = 100; §7.6, §14 #9). **Ruled 2026-10-06 (§14 #15):
+accept the honest limit.** A8's adopted bar is **detection AUC ≤ 0.60 at M ≥ 100, batch at close,
+7-day half-life**. That is the measured 0.586 plus 0.014 of headroom, about 1.4 times the
+standard deviation across replicate seeds (0.010). The bar starts at M = 100 because M = 50
+measured 0.600, right on the line with no headroom. Bigger pools lower the AUC, so 0.60 should
+hold above M = 100, but the 7-day half-life was only run at M = 50 and 100. The simulator reads
+the bar from one constant, `A8_BAR` in [`experiments.py`](../src/philotes_sim/experiments.py). Its
+A8 check judges every arm with M ≥ 100 against it, leaves smaller communities n/a, and a fresh
+sweep report names the bar it applied. In the 7-day runs
+at M = 100, A1 and A3–A8 all pass (97% placed, 98% at a preferred size, 0.2% locked, bottom
+decile 89% of median, 56% of newcomers within 3 seeds, 55% co-signup reunion, AUC 0.586).
+**Phase 0's exit criteria are met** under the ruled async shape from M = 100 up. Suggested
+starting points for 4-player co-op, one region:
 
 - Median peak wait under 10 minutes at `M` ≈ 200 with availability windows.
 - Hard-block lockout in under 1% of peak ticks at realistic avoid rates.
@@ -616,6 +640,13 @@ pooling from day one.
 One community, async Archipelago multiworlds first (§14 #3), 18+. It runs the §9.3 flow and uses matcher v0 from
 Phase 0. Moderation is done by the host community's mods. Success: people use it more than once,
 reunions happen, and at least one group graduates to its own server.
+
+**Say plainly that avoids are honoured** (ruled 2026-10-06, §14 #15). Wherever a player can set an
+avoid (the post-session card, §9.3) and in the user docs, the product states that avoids
+are honoured, so someone who watches who they get matched with may be able to partly work out
+that a person avoided them. It must not claim avoids are undetectable. This is the cost of the
+honest limit (§7.6), and players should know it before they rely on an avoid. Anyone who needs
+certainty uses a hard block or a report.
 
 ### Phase 2: more communities
 
@@ -655,16 +686,16 @@ asks for them:
 | 5 | **Monetization, or none** | **RULED 2026-10-05: lean taken.** None. Donations to cover hosting at most, and never paywalled safety (§13). | Ceryce |
 | 6 | **Hosting** | **RULED 2026-10-05: lean taken.** Phase 0 needs none. Phase 1: the cheapest workable option, either one small VPS or a serverless HTTP-interactions bot with per-game queue state (for example Cloudflare Workers + Durable Objects). Decide at Phase 1 start. | Ceryce (tech recommendation from us) |
 | 7 | Implementation language | **RULED 2026-10-05: lean taken.** Python for Phase 0 (OR-Tools CP-SAT baseline, fast iteration). Revisit when hosting is chosen. | Engineering; confirm with Ceryce |
-| 8 | Hard-block cap | 5, then adjust using Phase 0 lockout data. Phase 0 data: [phase0-results.md](phase0-results.md#hard-block-cap-14-8-1--3--5--10--25). | Ceryce, after Phase 0 |
+| 8 | Hard-block cap | **RULED 2026-10-06: 10 per player** (Ceryce, "Raise it (10)": "More room for people who need many blocks, at ~1-2 points more lockout if blocking is heavy."). Phase 0: at the default hard-block rate the cap doesn't bind above 3. If people hard-block often (40% of avoids), 5 vs 25 gives 7.0% vs 9.6% live peak-tick lockout, and 10 gives 9.1%. Async: no difference at any cap. §7.2, §8. Simulator default `policy.hard_cap` is now 10. Phase 0 data: [phase0-results.md](phase0-results.md#hard-block-cap-14-8-1--3--5--10--25). | Ceryce |
 | 9 | Soft-avoid decay | **RULED 2026-10-06: half-life ~7 days** (Ceryce, "Short avoid half-life (~7 days)"), chosen to make silent rejection hardest to detect (§7.6). Phase 0: half-life doesn't move hard lockout; 7 days gives the lowest detection AUC and the most re-matches with avoided people (async 31%). Phase 0 data: [phase0-results.md](phase0-results.md#soft-avoid-half-life-14-9-7--14--30--60--90-days). | Ceryce |
 | 10 | Reveal mutual `more`? | **RULED 2026-10-05: lean taken.** Never. That is the dating-app mechanic. | Ceryce |
 | 11 | Implicit signals (co-queue, session length) | **RULED 2026-10-05: lean taken.** Not in v1. Explicit signals only. | Ceryce |
 | 12 | Should anchors also absorb high-avoid players? | **RULED 2026-10-05: lean taken.** No. Anchors are for newcomers only. Asking volunteers to carry difficult players is unfair and will burn them out. | Ceryce |
 | 13 | Minors | **RULED 2026-10-05: lean taken.** 18+ only. Revisit only with real age assurance and a separate design. | Ceryce |
 | 14 | Microsoft patent US 7,677,970 status | Confirm it has lapsed before Phase 1. | Ceryce (legal) |
-| 15 | Phase 0 exit thresholds | **RULED 2026-10-06: async criteria A1–A8 adopted, seeds batched once at window close** (Ceryce, "Adopt them, batch at window close"). A2 applies only to a rolling cadence. A8 (detection) is not met at any setting tried (§12). The live co-op criteria in §12 stay as the bar for the fallback niche. Data: [phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule). | Ceryce |
+| 15 | Phase 0 exit thresholds | **RULED 2026-10-06: async criteria A1–A8 adopted, seeds batched once at window close** (Ceryce, "Adopt them, batch at window close"). A2 applies only to a rolling cadence. **A8 RULED 2026-10-06: accept the honest limit** (Ceryce, "Accept the honest limit": "Loosen A8's bar to what the 7-day half-life achieves (~0.6) and say plainly in the product that avoids are honoured, so a determined person can partly infer one. Keeps R4 intact; Phase 0 exits and Phase 1 can start."). A8 as written (AUC within 0.05 of 0.5) failed everywhere. The adopted bar is detection AUC ≤ 0.60 at M ≥ 100, batch at close, 7-day half-life (measured 0.586). With it, Phase 0's exit criteria are met (§12), and Phase 1 must say avoids are honoured (§7.6, §12). The live co-op criteria in §12 stay as the bar for the fallback niche. Data: [phase0-results.md](phase0-results.md#async-proposed-criteria-for-ceryce-to-rule). | Ceryce |
 | 16 | Banter/content-tolerance axis | **RULED 2026-10-05: lean taken.** Unsure. It could be a strong signal and it could also be a proxy for bad behaviour. Test in alpha. | Ceryce |
 | 17 | Cross-community moderation model | Unsolved. Needed before Phase 2. | Ceryce + host communities |
 | 18 | Keep the newcomer boost and anchors? | **RULED 2026-10-06: drop both from v1** (Ceryce, "Drop both from v1"). Phase 0: no boost length beat off, and anchors fired but didn't measurably help newcomers ([phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off)). Revisit only if alpha shows newcomers struggling. §7.4 keeps the design. | Ceryce |
 
-"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. #9, #15 and #18 were ruled 2026-10-06 shortly after midnight CT, from Phase 0 follow-up pickers over Telegram. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #8 (after Phase 0), #14 (before Phase 1) and #17 (before Phase 2).
+"Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. #9, #15 and #18 were ruled 2026-10-06 shortly after midnight CT, from Phase 0 follow-up pickers over Telegram. A8 within #15 was ruled 2026-10-06 at 22:38 CT and #8 at 22:39 CT, from two more Telegram pickers. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #14 (before Phase 1) and #17 (before Phase 2).
