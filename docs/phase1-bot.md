@@ -216,10 +216,61 @@ Early ending/extending by members remains future work; this slice uses the exist
 end. No Discord connection, Archipelago download/install, real generator/server or third-party
 upload was performed during development. The GitHub PR/CI are the only publishing operations.
 
+## Slice 4: moderation review tools
+
+`moderation.py` measures retained avoid/block edges and report outcomes. It never writes edges,
+changes matching, removes players or assigns a reputation score. The existing matcher and §7.4
+assortativity measurement stay unchanged. Cross-community moderation (§14 #17) waits for Phase 2.
+
+Choices where the spec is silent:
+
+- **Burst detector:** at least three distinct accounts marking the same target within any inclusive
+  24-hour window in the last 30 days. **Repeated-pattern detector:** at least three accounts with
+  at least three common avoided/blocked targets in that rolling 30-day period. Both include soft
+  avoids and hard blocks (including report blocks). Three avoids is a review lead, not proof;
+  24 hours catches a short campaign and 30 days covers several weekly seeds. These are initial
+  fixed alpha thresholds, not calibrated estimates of abuse. Independent preferences and a shared
+  bad experience can also trigger them. Repeated-pattern evidence counts qualifying account triples,
+  not necessarily disjoint groups. Detection uses current edges and their last-applied timestamps,
+  not a new historical edge/event ledger: overwrites, forget, deletion and decay purge remove evidence.
+- **Privacy wins over identifying evidence.** §8 asks for coordinated-blocking review, while §11
+  says moderators never see who avoided whom. Notices show counts, burst target and time range,
+  or counts of qualifying triples and the repeated-pattern window; never avoider IDs or the shared
+  target list. This limits investigation deliberately. Ordinary mass avoidance does not trigger a
+  verdict or penalty; coordination notices are leads about a possible group campaign, not allegations
+  against the target. Reports still supply the human-review allegation independently.
+- **Delivery:** the existing private moderator transport on the timer (and report resolution).
+  One notice per burst target, repeated-pattern detector, or repeat reporter per 30 days; successful
+  deliveries alone are remembered in SQLite across restarts. Failed delivery retries on the next
+  timer. Notice keys expire after 30 days and contain no avoider IDs. Players receive no notices.
+- **`/mod history user:<player> page:<n>`** lists retained reports filed and received, newest first,
+  ten per page, with filing date, current outcome, resolution note and last outcome date. It also
+  shows the reporter's abusive/false count divided by all retained reports filed. Reports and the
+  audit log follow the existing moderation policy: retained indefinitely, including after `/leave`;
+  no new finite moderation retention period is invented. Co-play/seed retention remains unchanged.
+- **`/mod resolve report:<id> outcome:<open|resolved|abusive|false> note:<text>`** defaults to resolved
+  for compatibility. Any retained report may be revised or reopened, with previous outcome and note
+  in the audit log. All outcomes leave the report's safety block intact: declaring an allegation
+  false does not establish that rematching is safe. Only the author can clear that edge with
+  `/forget` or another card mark. Reopening never recreates an edge the author cleared.
+- **Repeat-reporter review:** at least three reports marked abusive/false and at least 50% of all
+  retained reports filed. Open and ordinarily resolved reports remain in the denominator. Three
+  avoids a single dispute flagging someone; the rate avoids flagging a prolific reporter for a few
+  mistakes. This is a moderator-only descriptive rate, never a matching input or automatic sanction.
+- **`/mod audit page:<n>`** shows ten newest audit entries per page: actor ID, action, subject,
+  detail and UTC timestamp. Successful remove, restore, resolve/reopen, close-window, report-list,
+  history and audit reads are recorded; rejected calls do not create moderator-action entries.
+  Resolution notes are capped at 1,500 characters. Existing databases gain additive tables on open;
+  existing reports remain compatible. Audit rows contain no avoid-edge identities.
+
+Offline synthetic tests cover detector thresholds/negatives, moderator gates, private delivery,
+deduplication, report-history pagination and retention, outcome reversal, safety-block preservation,
+rates and persistent audits. No Discord connection, AP process or external moderation service was
+used. The GitHub PR and CI are the publishing operations.
+
 ## Slices still to come
 
 | Slice | What it contains |
 |---|---|
 | **Seed lifecycle follow-up** | Members can end a seed early or extend it; real-install/private-server acceptance testing and host provisioning remain Ceryce's steps. |
-| **4. Trust & safety review tooling** | Coordinated hard-blocking detection (§8: several accounts that often share seeds blocking the same target within a short window) sent to moderators for review. Per-target report history for moderators, still showing only counts of avoids. Handling for abusive reporting. |
 | **5. Alpha measurement** | Privacy-preserving aggregates for the Phase 1 success test (repeat use, reunions, graduation) and the async criteria A1, A3–A8 on real data, so the Phase 0 assumptions can be checked. Also the banter-tolerance axis trial (§14 #16). |

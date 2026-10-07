@@ -101,7 +101,10 @@ server. `philotes-bot check` confirms local configuration without connecting.
 16. Check that each member receives one hand-off DM, can see the seed channel, and an unrelated
     member cannot see it. Discord administrators can always see private channels. Use `/recent`
     to exercise more, neutral, avoid, block and report; submit the report form and check that only
-    the moderators see the post. Try `/mod reports` and `/mod resolve`. Restart the process and
+    the moderators see the post. Try `/mod reports`, `/mod history user:<player> page:1`, and `/mod resolve`
+    with `outcome:abusive`, `outcome:false`, then `outcome:open` to reverse it. Check `/mod audit`
+    for actor, action and dates. Outcomes leave safety blocks intact; only their author clears them.
+    Coordination notices contain aggregate evidence without avoider identities. Restart the process and
     try an old card button again. Test a member with DMs closed and use `/status`/`/recent` instead.
 17. For a quick card/cleanup trial, use a separate disposable test database and shorten
     `[window] goal_days` in that test configuration, keeping one value per goal. Restore defaults
