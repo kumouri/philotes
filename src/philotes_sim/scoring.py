@@ -17,15 +17,30 @@ built from the same coefficients, and a test checks the two agree exactly.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Protocol
 
 import numpy as np
 
 from .config import MINUTES_PER_DAY, MINUTES_PER_HOUR, Policy, Shape, Weights
 from .edges import HARD, MORE, SOFT, EdgeStore, more_weight, newness, reunion_bump
-from .population import Player
 
 LEVEL_SIZE, LEVEL_GAMES, LEVEL_BREAK_SOFT = 1, 2, 3  # §7.5 ladder rungs that the sim models
+
+
+class MatchPlayer(Protocol):
+    """What the objective reads about a player. The sim's ``Player`` and the bot's sign-ups fit."""
+
+    pref_lo: int
+    pref_hi: int
+    acc_lo: int
+    acc_hi: int
+    sessions: int
+    mutual_count: int
+    anchor: bool
+    style: tuple[int, ...]  # per comm-style axis: -1 / +1 for the two extremes, 0 for "either"
+    tags: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -67,7 +82,7 @@ def _key(i: int, j: int) -> tuple[int, int]:
 
 def build_context(
     cands: list[Candidate],
-    players: dict[int, Player],
+    players: Mapping[int, MatchPlayer],
     store: EdgeStore,
     now: float,
     weights: Weights,
