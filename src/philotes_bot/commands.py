@@ -120,7 +120,25 @@ COMMANDS: tuple[Command, ...] = (
         "mod resolve",
         "mod_resolve",
         "Mark a report handled",
-        (Option("report", INT, "Report number", required=True), Option("note", STR, "Note")),
+        (
+            Option("report", INT, "Report number", required=True),
+            Option("note", STR, "Note"),
+            Option(
+                "outcome", STR, "Review outcome", choices=("open", "resolved", "abusive", "false")
+            ),
+        ),
+    ),
+    Command(
+        "mod history",
+        "mod_history",
+        "Retained reports filed and received",
+        (Option("user", USER, "Who", True), Option("page", INT, "Page (10 reports)")),
+    ),
+    Command(
+        "mod audit",
+        "mod_audit",
+        "Moderator action log",
+        (Option("page", INT, "Page (10 actions)"),),
     ),
     Command("mod close-window", "mod_close_window", "Close this week's window and form seeds now"),
 )

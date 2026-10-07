@@ -596,6 +596,7 @@ class Bot:
             return _err(f"{mention(user)} isn't in Philotes.")
         self.store.set_removed(user, self.clock(), reason.strip() or "no reason given")
         self.store.delete_user_signups(user)
+        self.store.audit(inv.user_id, "remove", str(user), reason[:1500], self.clock())
         return Reply(
             f"{mention(user)} is out of matching and their sign-up is withdrawn. Seeds they are "
             "already in are unchanged."
@@ -607,11 +608,13 @@ class Bot:
         if self.store.player(user) is None:
             return _err(f"{mention(user)} isn't in Philotes.")
         self.store.set_removed(user, None, None)
+        self.store.audit(inv.user_id, "restore", str(user), "", self.clock())
         return Reply(f"{mention(user)} can sign up again.")
 
     def mod_reports(self, inv: Invocation) -> Reply:
         if (r := self._mod(inv)) is not None:
             return r
+        self.store.audit(inv.user_id, "reports", "open", "", self.clock())
         rows = self.store.reports("open")
         if not rows:
             return Reply("No open reports.")
@@ -623,12 +626,84 @@ class Bot:
             )
         )
 
-    def mod_resolve(self, inv: Invocation, report: int, note: str = "") -> Reply:
+    def mod_resolve(
+        self, inv: Invocation, report: int, note: str = "", outcome: str = "resolved"
+    ) -> Reply:
         if (r := self._mod(inv)) is not None:
             return r
-        if not self.store.resolve_report(report, note.strip() or "resolved"):
-            return _err(f"No open report #{report}.")
-        return Reply(f"Report #{report} resolved.")
+        if outcome not in ("open", "resolved", "abusive", "false"):
+            return _err("Outcome must be open, resolved, abusive or false.")
+        old = next((r for r in self.store.reports() if r.id == report), None)
+        if old is None:
+            return _err(f"No report #{report}.")
+        self.store.review_report(
+            report,
+            outcome,
+            note.strip()[:1500] or outcome,
+            inv.user_id,
+            f"{old.status} ({old.resolution or 'no note'}) -> {outcome}: {note.strip()[:1500]}",
+            self.clock(),
+        )
+        self._review_signals()
+        return Reply(f"Report #{report} {outcome}. Safety block unchanged.")
+
+    def mod_history(self, inv: Invocation, user: int, page: int = 1) -> Reply:
+        if (r := self._mod(inv)) is not None:
+            return r
+        if page < 1:
+            return _err("Page must be at least 1.")
+        rows = [r for r in reversed(self.store.reports()) if user in (r.reporter, r.target)]
+        self.store.audit(inv.user_id, "history", str(user), f"page {page}", self.clock())
+        total = sum(r.reporter == user for r in rows)
+        bad = sum(r.reporter == user and r.status in ("abusive", "false") for r in rows)
+        lines = [
+            f"Report history for {mention(user)}; page {page}/{max(1, (len(rows) + 9) // 10)}; "
+            f"abusive/false filed: {bad}/{total} ({bad / total:.0%})."
+            if total
+            else f"Report history for {mention(user)}; page {page}; no reports filed."
+        ]
+        for r in rows[(page - 1) * 10 : page * 10]:
+            changed = self.store._one(
+                "SELECT t FROM moderation_audit WHERE action = 'resolve'"
+                " AND subject = ? ORDER BY id DESC LIMIT 1",
+                str(r.id),
+            )
+            outcome_date = ts(changed[0]) if changed else "not reviewed"
+            lines.append(
+                f"#{r.id} {ts(r.filed_at)} {'filed' if r.reporter == user else 'received'}: "
+                f"{mention(r.reporter)} about {mention(r.target)} — {r.status}; "
+                f"{r.resolution or 'no outcome'}; outcome date: {outcome_date}"
+            )
+        return Reply("\n".join(lines))
+
+    def mod_audit(self, inv: Invocation, page: int = 1) -> Reply:
+        if (r := self._mod(inv)) is not None:
+            return r
+        if page < 1:
+            return _err("Page must be at least 1.")
+        self.store.audit(inv.user_id, "audit", "log", f"page {page}", self.clock())
+        rows = self.store._all(
+            "SELECT * FROM moderation_audit ORDER BY id DESC LIMIT 10 OFFSET ?", (page - 1) * 10
+        )
+        return Reply(
+            f"Audit page {page}\n"
+            + "\n".join(
+                f"#{id} {ts(t)} {mention(actor)} {action} {subject}: {detail}"
+                for id, actor, action, subject, detail, t in rows
+            )
+        )
+
+    def _review_signals(self) -> None:
+        from .moderation import abusive, coordinated
+
+        now = self.clock()
+        flags = coordinated(self.store, now) | abusive(self.store)
+        self.store._exec("DELETE FROM review_notices WHERE t < ?", now - 30 * DAY)
+        for key, evidence in flags.items():
+            if self.store._one("SELECT key FROM review_notices WHERE key = ?", key):
+                continue
+            if self.transport.post_mod(Message(evidence)):
+                self.store._exec("INSERT INTO review_notices VALUES (?, ?)", key, now)
 
     def mod_close_window(self, inv: Invocation) -> Reply:
         """Close this week's window now and form seeds (operations and testing)."""
@@ -637,6 +712,7 @@ class Bot:
         now = self.clock()
         wid, _, _ = self._window(now)
         n = self._close_and_form(wid, now)
+        self.store.audit(inv.user_id, "close-window", str(wid), f"{n} seeds", now)
         return Reply(f"Window closed: {n} seed(s) formed. The next window is open.")
 
     # --- the clock -------------------------------------------------------------------------
@@ -656,6 +732,7 @@ class Bot:
                 if s.channel_id is not None:
                     self.transport.delete_channel(s.channel_id)
                 self.store.mark_channel_closed(s.id)
+        self._review_signals()
         sf = self.cfg.safety
         self.store.purge(
             now, sf.soft_half_life_days, self.cfg.policy().soft_negligible, sf.coplay_retention_days

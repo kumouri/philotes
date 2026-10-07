@@ -79,8 +79,15 @@ CREATE TABLE IF NOT EXISTS reports (
     seed_id INTEGER,
     reason TEXT NOT NULL,
     filed_at REAL NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open',   -- open | resolved
+    status TEXT NOT NULL DEFAULT 'open',   -- open | resolved | abusive | false
     resolution TEXT
+);
+CREATE TABLE IF NOT EXISTS moderation_audit (
+    id INTEGER PRIMARY KEY, actor INTEGER NOT NULL, action TEXT NOT NULL,
+    subject TEXT NOT NULL, detail TEXT NOT NULL, t REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS review_notices (
+    key TEXT PRIMARY KEY, t REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS ap_jobs (
     seed_id INTEGER PRIMARY KEY REFERENCES seeds(id) ON DELETE CASCADE,
@@ -437,6 +444,43 @@ class Store:
             report_id,
         )
         return cur.rowcount > 0
+
+    def audit(self, actor: int, action: str, subject: str, detail: str, now: float) -> None:
+        self._exec(
+            "INSERT INTO moderation_audit (actor, action, subject, detail, t)"
+            " VALUES (?, ?, ?, ?, ?)",
+            actor,
+            action,
+            subject,
+            detail,
+            now,
+        )
+
+    def review_report(
+        self, report_id: int, outcome: str, note: str, actor: int, detail: str, now: float
+    ) -> None:
+        """Persist the outcome and its audit together, including on interruption."""
+        with self.db:
+            self.db.execute(
+                "UPDATE reports SET status = ?, resolution = ? WHERE id = ?",
+                (outcome, note, report_id),
+            )
+            self.db.execute(
+                "INSERT INTO moderation_audit (actor, action, subject, detail, t)"
+                " VALUES (?, 'resolve', ?, ?, ?)",
+                (actor, str(report_id), detail, now),
+            )
+
+    def set_report_outcome(self, report_id: int, outcome: str, note: str) -> bool:
+        return (
+            self._exec(
+                "UPDATE reports SET status = ?, resolution = ? WHERE id = ?",
+                outcome,
+                note,
+                report_id,
+            ).rowcount
+            > 0
+        )
 
     # --- retention (§11) -------------------------------------------------------------------
 
