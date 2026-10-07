@@ -9,9 +9,10 @@ this person"* or *"avoid"*. The next time you are both queued, the matcher tries
 together, or keeps you apart. You don't get a friends list or profiles to browse, and there's no
 swiping.
 
-**Status: Phase 1 under way.** Phase 0's simulator met its exit criteria. The Phase 1 Discord
-bot has a local core, Discord adapter optional Archipelago automation and private moderation review tools; it has not been
-connected to Discord or used by anyone yet.
+**Status: Phase 1 build complete, pending live deployment.** Phase 0's simulator met its exit
+criteria. The bot includes the local core, Discord adapter, optional Archipelago automation,
+private moderation tools and anonymous alpha reports. It has not connected to Discord or served
+users. The host community is undecided; hosting is Ceryce's desktop for now.
 
 - [`docs/spec.md`](docs/spec.md) is the canonical spec. It covers the rulings, prior art, model and
   matcher, the density problem, trust & safety, privacy, phases and open questions.
@@ -83,6 +84,7 @@ bot also runs locally on an in-memory transport, with no token and no network.
 ```sh
 uv run philotes-bot demo       # a scripted two-week run, printed
 uv run philotes-bot console    # type commands as any user; move the clock with `advance 7d`
+uv run philotes-bot metrics --db philotes-bot.sqlite3 --out summary.csv  # local aggregates
 uv run philotes-bot check      # resolved config; says whether DISCORD_TOKEN is set, never its value
 uv run philotes-bot run        # host only: connect after following docs/SETUP.md
 ```

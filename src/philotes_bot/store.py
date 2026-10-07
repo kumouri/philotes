@@ -17,6 +17,14 @@ from itertools import combinations
 from philotes_sim.edges import HARD, MORE, SOFT, soft_avoid_weight
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS alpha_windows (
+    window_id INTEGER PRIMARY KEY,
+    closed_at REAL NOT NULL,
+    entries INTEGER NOT NULL, placed INTEGER NOT NULL,
+    slots INTEGER NOT NULL, preferred INTEGER NOT NULL,
+    locked INTEGER NOT NULL, unknown INTEGER NOT NULL,
+    seeds INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS players (
     user_id INTEGER PRIMARY KEY,
     joined_at REAL NOT NULL,
@@ -493,6 +501,7 @@ class Store:
                     "DELETE FROM edges WHERE author = ? AND target = ?", (e.author, e.target)
                 )
         cutoff = now - coplay_days * DAY
+        self.db.execute("DELETE FROM alpha_windows WHERE closed_at < ?", (cutoff,))
         self.db.execute("DELETE FROM coplay WHERE last_t < ?", (cutoff,))
         old = [r[0] for r in self._all("SELECT id FROM seeds WHERE ends_at < ?", cutoff)]
         for sid in old:

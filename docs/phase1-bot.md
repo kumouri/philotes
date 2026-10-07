@@ -20,6 +20,7 @@ token, makes no network calls, and nothing in it imports a Discord library.
 | `commands.py` | The slash-command list, declared once. The console uses it now, and the Discord adapter will register the same list. |
 | `transport.py` | Core side effects (DM, create/delete a seed channel, seed posts/files, moderator posts), and `InMemoryTransport`. |
 | `console.py`, `cli.py` | `philotes-bot demo`, `philotes-bot console`, `philotes-bot check`. |
+| `measurement.py` | Anonymous weekly/cumulative criteria and success-test reporting and CSV/JSON export. |
 | `text.py` | Wording the spec constrains, including the "avoids are honoured" statement. |
 
 ### The flow
@@ -268,9 +269,78 @@ deduplication, report-history pagination and retention, outcome reversal, safety
 rates and persistent audits. No Discord connection, AP process or external moderation service was
 used. The GitHub PR and CI are the publishing operations.
 
-## Slices still to come
+## Slice 5: alpha measurement
 
-| Slice | What it contains |
+`measurement.py` reads the bot's own SQLite store. `philotes-bot metrics --db <path>` prints a
+JSON report; `--out summary.csv` or `--out summary.json` writes the same anonymous aggregates.
+The CLI opens an existing database read-only, needs no token and does not start the core,
+Discord, AP or any transport. It can read slice 4 databases without migrating or backfilling them.
+`/mod metrics` uses the existing moderator gate and ephemeral reply/attachment handling.
+It never posts reports to the moderator channel or sends player messages.
+
+### Definitions and limits
+
+| Test | Live measurement |
 |---|---|
-| **Seed lifecycle follow-up** | Members can end a seed early or extend it; real-install/private-server acceptance testing and host provisioning remain Ceryce's steps. |
-| **5. Alpha measurement** | Privacy-preserving aggregates for the Phase 1 success test (repeat use, reunions, graduation) and the async criteria A1, A3–A8 on real data, so the Phase 0 assumptions can be checked. Also the banter-tolerance axis trial (§14 #16). |
+| A1 | Placed eligible sign-ups / eligible sign-ups at close; ≥ 90%. |
+| A2 | n/a: only applies to rolling cadence; the ruled cadence is batch-at-close. |
+| A3 | Preferred-size placements / placed seats; ≥ 75%. Each player's range is checked separately. |
+| A4 | Hard-locked sign-ups / eligible sign-ups in the original pool; < 1%. The shared Phase 0 lockout search unions feasible lobbies across all listed goals, ignores soft avoids and uses accepted sizes. Any node-limit unknown makes the criterion n/a. |
+| A5 | **not measurable on live data** with this retention model: closed sign-ups are deleted, so per-player historical placement denominators are missing. Seed counts alone cannot give placement rates. |
+| A6 | **not measurable on live data**: current marks overwrite earlier marks and may be forgotten; first mutual-more timing and the simulator's measured newcomer cohort are missing. Current mutual marks do not establish which seed first formed them. |
+| A7 | **not measurable on live data**: the store cannot reconstruct mutual-more state when the two players signed up. Using current mutual marks would change the denominator and bias the test. |
+| A8 | **not measurable on live data**: the detection test requires first-session card labels, including neutral defaults, and later session histories. Labels are not retained, and expired or overwritten avoids are not substitutes. Reads the ruled `experiments.A8_BAR` for both its displayed bar and M threshold; n/a below M = 100 exactly as the simulator. Above that threshold it still remains n/a without labels. |
+| Phase 1 repeat use | Counts placements of people who already appear in an earlier retained seed. Pass if at least one repeat placement exists, fail if there are seats but none repeat, n/a without seats. |
+| Phase 1 reunions | Counts unordered co-player pair events with an earlier retained co-match. Same observed/nonzero test as repeat use. This is reunion formation, not an assertion of actual play or mutual preference. |
+| Phase 1 graduation | **not measurable on live data**: a group moving to its own server is outside the bot's view. Inactivity and `/leave` are not evidence of graduation. Overall success remains n/a when the observed components pass but graduation is unknown; fail if an observed component fails. |
+
+`metric_helpers.placement_metrics` was extracted from the simulator and both callers use it.
+The ruled criteria checks are the simulator's `experiments.check`, not copied thresholds.
+Exports use the same metric column names as Phase 0's `summary.csv`; unavailable numbers are
+JSON null / blank CSV cells. Each A1–A8 check has pass / FAIL / n/a, a sample size (null if no
+valid denominator exists), and a reason for n/a. **There is no claim that the live alpha meets
+Phase 0's criteria while A5–A8 are unavailable.** The bot has no synthetic ground-truth enjoyment,
+actual played hours, counterfactual friendship or off-platform telemetry, and none is invented.
+
+### Choices where the spec is silent
+
+- Capture only anonymous close totals (entries, placed, slots, preferred, locked, unknown and
+  seeds) before deleting sign-ups. No historical individual sign-up ledger, edge ledger or
+  third-party analytics is added. Old closes cannot be reconstructed and are not counted as zero
+  observations. Upgrading adds one SQLite aggregate table; the close's window key prevents duplicate
+  totals. Existing core seed/delivery crash windows remain; this is not a transactional lifecycle
+  rewrite.
+- Reports group closes and formations into Monday-based UTC calendar weeks. Manual early closes
+  count in their actual week. Carried sign-ups count once in each closed pool where they remain
+  eligible, matching the simulator's per-window denominator. Removed/nonexistent players are
+  excluded. Placement includes manual AP hand-off and seeds whose AP generation later fails:
+  these are matcher/formation metrics, not completion metrics.
+- Cumulative means **retained data**, not all-time tracking. Close aggregates expire with the
+  configured co-play horizon (default 365 days). Reports filter expired aggregates even before
+  the next timer purge. Anonymous totals cannot be attributed back to an account and survive
+  `/leave` until expiry; identifiable seat and co-play records still disappear on deletion.
+  Repeat/reunion counts can fall after deletion or retention expiry. Earlier retained seeds
+  provide the baseline for each week's repeat/reunion observations.
+- M is the current count of opted-in, nonremoved players, not Discord membership or weekly sign-ups.
+  Reports name that basis through the definitions here; it does not reconstruct historical M.
+  The output includes the actual 7-day half-life and hard-cap configuration and batch cadence.
+- The simulator supplies replicate standard deviations, **no confidence intervals**. A live history
+  has no independent simulator replicates. Reports state that uncertainty limitation and expose
+  denominators rather than presenting replicate SD as a confidence interval or inventing one.
+- No survey or graduation collection command is added. The host can separately ask for voluntary
+  evidence that a group graduated; that evidence is not inferred from bot usage or stored here.
+  Banter-tolerance trial (§14 #16) remains a live-alpha experiment, with no new matching axis in
+  this measurement slice.
+
+Offline tests cover known ratios and fail cases, cross-goal lockout, insufficient samples,
+unknown searches, all unavailable criteria, the A8 constant, repeat use and reunions, gates,
+identity-free CSV/JSON, restart persistence, deletion, retention and read-only legacy CLI reports.
+No Discord connection, real AP process or external analytics service was used.
+
+## Between the build and live alpha
+
+All five Phase 1 build slices are complete; deployment and real use remain untested. Ceryce needs
+to choose the 18+ host community/moderators, configure her desktop and a private Discord test
+server, then follow [SETUP.md](SETUP.md) for Discord/AP acceptance testing before inviting players.
+The voluntary graduation check and banter-tolerance trial happen during alpha. Member-driven
+seed early ending/extending remains a lifecycle follow-up, not part of this five-slice build.
