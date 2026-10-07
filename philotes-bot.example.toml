@@ -1,0 +1,32 @@
+# Philotes bot configuration. Copy to philotes-bot.toml (git-ignored) and fill in.
+# Secrets never go here: DISCORD_TOKEN lives in .env (also git-ignored). See docs/SETUP.md.
+# Every key is optional; the values below are the defaults.
+
+db_path = "philotes.db"
+
+[community]
+# The one host community (spec §14 #3, Ceryce's decision). Discord IDs: enable Developer Mode in
+# Discord, then right-click the server, role, channel or category and "Copy ID".
+name = "unconfigured"
+# guild_id = 0           # the host server; commands from anywhere else are refused
+# mod_role_id = 0        # holders may use /mod commands
+# mod_channel_id = 0     # private channel the bot posts reports into
+# seed_category_id = 0   # category under which private seed channels are created
+
+[window]
+# The weekly sign-up window closes at this time (UTC) and all seeds form at once (§14 #15).
+close_weekday = 6        # 0 = Monday … 6 = Sunday
+close_hour_utc = 23
+goals = ["short", "medium", "long"]   # goal lengths players choose between
+goal_days = [7, 14, 28]               # how long a seed of each goal length runs
+size_min = 3
+size_max = 8
+default_preferred = [4, 6]
+default_accepted = [3, 8]
+
+[safety]
+hard_cap = 10                 # blocks per player (§14 #8); report blocks don't count
+soft_half_life_days = 7.0     # avoid decay (§14 #9)
+recently_played_days = 14     # how long after a seed you can still mark someone
+min_account_age_days = 30     # Discord accounts younger than this can't join; 0 = off
+coplay_retention_days = 365

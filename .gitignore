@@ -4,3 +4,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 /results/
+
+# Phase 1 bot: secrets, the host's real config, and the local database never get committed.
+.env
+philotes-bot.toml
+*.db

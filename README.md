@@ -9,13 +9,17 @@ this person"* or *"avoid"*. The next time you are both queued, the matcher tries
 together, or keeps you apart. You don't get a friends list or profiles to browse, and there's no
 swiping.
 
-**Status: Phase 0.** The matcher simulator exists and has had its first run. Nothing user-facing
-exists yet.
+**Status: Phase 1 under way.** Phase 0's simulator met its exit criteria. The Phase 1 Discord
+bot's core runs locally, but it isn't connected to Discord or used by anyone yet.
 
 - [`docs/spec.md`](docs/spec.md) is the canonical spec. It covers the rulings, prior art, model and
   matcher, the density problem, trust & safety, privacy, phases and open questions.
 - [`docs/phase0-results.md`](docs/phase0-results.md) has the first sweep's results against the
   Phase 0 exit criteria. Its data is in [`docs/phase0-data/`](docs/phase0-data/).
+- [`docs/phase1-bot.md`](docs/phase1-bot.md) covers the Phase 1 bot: what is built, the choices
+  made where the spec is silent, and the slices still to come.
+  [`docs/SETUP.md`](docs/SETUP.md) has the host's setup steps, and
+  [`docs/user-guide.md`](docs/user-guide.md) is what players are told.
 
 Markdown is canonical. Any other format is rendered from the `.md` files.
 
@@ -32,6 +36,7 @@ covers both pool shapes: a live co-op queue, and an async Archipelago weekly sig
 | `scoring.py` | The §7 objective and hard constraints, shared by both matchers |
 | `matcher.py` | Matcher v0: the §7.1 heuristic and the exact CP-SAT baseline |
 | `lockout.py` | The §8 hard-block lockout check |
+| `rounds.py` | One matcher round over a waiting pool, and batch at close; shared with the bot |
 | `sim.py` | The simulation loop for both pool shapes |
 | `metrics.py` | Every §12 metric, including the silent-rejection detection test |
 | `experiments.py` | The sweep plan and the exit criteria |
@@ -66,13 +71,31 @@ uv run philotes-sim compare-matchers --out results/quality
 deterministic for a given `--seed`. The full sweep takes about 7 minutes on 48 cores. `results/` is
 git-ignored.
 
-### Test
+## Phase 1 bot
+
+`src/philotes_bot/` is the Discord bot for the closed alpha (spec §12 Phase 1): weekly sign-ups for
+async Archipelago seeds, seeds formed in one batch at window close by the simulator's own matcher,
+the post-seed card, reports to the host community's moderators, and the §11 data rights. This
+slice is the core. It runs locally on an in-memory transport, with no token and no network.
+[`docs/phase1-bot.md`](docs/phase1-bot.md) has the module map and the remaining slices.
+
+```sh
+uv run philotes-bot demo       # a scripted two-week run, printed
+uv run philotes-bot console    # type commands as any user; move the clock with `advance 7d`
+uv run philotes-bot check      # resolved config; says whether DISCORD_TOKEN is set, never its value
+```
+
+Configuration is `philotes-bot.toml` (copy `philotes-bot.example.toml`). The token goes in an
+untracked `.env`. Both are git-ignored. [`docs/SETUP.md`](docs/SETUP.md) has the host's steps.
+
+## Test
 
 ```sh
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
+The tests never touch the network: `tests/conftest.py` makes any connection attempt fail.
 CI (`.github/workflows/ci.yml`) runs the same lint and tests on pushes and pull requests.
 
 ## License

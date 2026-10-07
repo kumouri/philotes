@@ -28,7 +28,8 @@ from .config import MINUTES_PER_HOUR, MINUTES_PER_WEEK, Scenario
 from .edges import HARD, SOFT, EdgeStore
 from .lockout import check_pool
 from .population import Player, PopulationFactory, peak_hours
-from .scoring import LEVEL_BREAK_SOFT, LEVEL_GAMES, Candidate, ScoringContext, build_context
+from .rounds import eligible_games, match_round
+from .scoring import LEVEL_BREAK_SOFT, ScoringContext
 
 _OPEN, _END, _WEEK, _CLOSE = 0, 1, 2, 9  # CLOSE sorts last so a closing entry gets the final pass
 
@@ -328,49 +329,35 @@ class Simulation:
 
     # --- matching ----------------------------------------------------------------------------
 
-    def _eligible(self, e: Entry) -> tuple[int, ...]:
-        return e.games if e.level >= LEVEL_GAMES else e.games[:1]
-
     def _run_matcher(self, T: float) -> None:
         waiting = sorted(self.pool.values(), key=lambda e: e.eid)
         if len(waiting) < 2:
             return
         self._note_opportunities(waiting, T)
-        counts: dict[int, int] = {}
-        for e in waiting:
-            for g in self._eligible(e):
-                counts[g] = counts.get(g, 0) + 1
-        placed: set[int] = set()
         scn = self.scn
-        for g in sorted(counts, key=lambda g: (-counts[g], g)):
-            cands_e = [e for e in waiting if e.eid not in placed and g in self._eligible(e)]
-            if len(cands_e) < 2:
-                continue
-            min_lo = min(
-                self.players[e.pid].acc_lo if e.level >= 1 else self.players[e.pid].pref_lo
-                for e in cands_e
-            )
-            if len(cands_e) < min_lo:
-                continue
-            cands = [Candidate(e.pid, T - e.open_t, e.level) for e in cands_e]
-            ctx = build_context(
-                cands,
-                self.players,
-                self.store,
-                T,
-                scn.weights,
-                scn.policy,
-                scn.shape,
-                self.rng_match,
-            )
-            res = matcher.solve(ctx, scn.policy, seed=scn.seed)
+
+        def on_solve(ctx: ScoringContext, res: matcher.MatchResult) -> None:
             self.matcher_runs += 1
             self.matcher_seconds += res.seconds
             if self.capture and ctx.n >= 6 and len(self.contexts) < self.capture:
                 self.contexts.append(ctx)
-            for lob in res.lobbies:
-                self._start_session(T, g, [cands_e[i] for i in lob])
-                placed.update(cands_e[i].eid for i in lob)
+
+        formed = match_round(
+            waiting,
+            self.players,
+            self.store,
+            T,
+            scn.weights,
+            scn.policy,
+            scn.shape,
+            self.rng_match,
+            seed=scn.seed,
+            on_solve=on_solve,
+        )
+        # Starting a session only touches its own members' records, so starting them after the
+        # whole round is the same as starting each as its game is solved.
+        for g, members in formed:
+            self._start_session(T, g, members)
 
     def _note_opportunities(self, waiting: list[Entry], T: float) -> None:
         """R2 opportunities: two mutual-`more` players waiting at once for a shared game."""
@@ -380,7 +367,7 @@ class Simulation:
                 o = by_pid.get(b)
                 if o is None or e.pid > b:
                     continue
-                if set(self._eligible(e)) & set(self._eligible(o)):
+                if set(eligible_games(e)) & set(eligible_games(o)):
                     self.opportunities.add((min(e.eid, o.eid), max(e.eid, o.eid)))
 
     def _start_session(self, T: float, game: int, members: list[Entry]) -> None:
