@@ -83,7 +83,7 @@ def test_all_na_reasons_and_ruled_bar(monkeypatch):
     assert all(row[f"A{i}"] == "n/a" for i in range(1, 9))
     for key in ("A5", "A6", "A7"):
         assert "Insufficient" in row["reasons"][key]
-    assert "not measurable by design" in row["reasons"]["A8"]
+    assert "Suppressed" in row["reasons"]["A8"]
     assert "Rolling cadence" in row["reasons"]["A2"]
     monkeypatch.setattr(experiments, "A8_BAR", experiments.AucBar(0.57, 2))
     assert "M = 2" in report(w.store, w.bot.cfg, w.clock.t)[-1]["reasons"]["A8"]
@@ -188,7 +188,7 @@ def test_cli_readonly_legacy_and_no_database_creation(tmp_path, capsys):
     assert main(["metrics", "--db", str(db), "--out", str(output)]) == 0
     assert db.read_bytes() == before
     assert json.loads(output.read_text())[-1]["A1"] == "n/a"
-    assert "not measurable by design" in capsys.readouterr().out
+    assert "Suppressed" in capsys.readouterr().out
     missing = tmp_path / "missing.db"
     with pytest.raises(SystemExit):
         main(["metrics", "--db", str(missing)])
@@ -245,7 +245,7 @@ def test_multiweek_measured_followup_history(tmp_path):
     assert row["sample_sizes"]["A7"] == 1
     assert row["population.M"] == 100
     assert row["A8"] == "n/a" and row["detect_auc"] is None
-    assert "not measurable by design" in row["reasons"]["A8"]
+    assert "Suppressed" in row["reasons"]["A8"]
     assert not w.store._all("SELECT * FROM alpha_pending_pairs")
     assert not w.store._all("SELECT * FROM signups")
     assert not w.store._one("SELECT name FROM sqlite_master WHERE name = 'alpha_first_cards'")

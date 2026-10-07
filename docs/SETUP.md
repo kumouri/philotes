@@ -214,7 +214,6 @@ Use the actual configured database path; the command never creates a missing dat
 Moderators can use `/mod metrics` for the same private aggregate report. See
 [phase1-bot.md](phase1-bot.md#slice-5-alpha-measurement) for sample sizes, retention,
 A1–A8 applicability and the success test's limits. Reports do not expose identities or marks,
-and do not prove actual play. A5–A7 are recorded prospectively; A8 stays n/a by design
+and do not prove actual play. A5–A7 are recorded prospectively; A8 uses anonymous card-time score histograms
 to preserve avoid deletion. Players may optionally report graduation with `/graduated confirm:true`;
-these are reporter counts, not distinct groups or externally verified outcomes. No complete
-alpha criterion pass is claimed while A8 remains n/a.
+these are reporter counts, not distinct groups or externally verified outcomes. A8 reports its histogram error bound and detector timing limitations; sparse samples stay n/a.
