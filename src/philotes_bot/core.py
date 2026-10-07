@@ -408,7 +408,19 @@ class Bot:
             return _err("You're no longer in Philotes.")
         if action == "report":
             return self._report(inv.user_id, target, reason or "", seed_id)
-        return self._mark(inv.user_id, target, action)
+        reply = self._mark(inv.user_id, target, action)
+        if reply.ok:
+            from .measurement import save_a8
+
+            save_a8(
+                self.store,
+                inv.user_id,
+                target,
+                action,
+                self.clock(),
+                self.cfg.safety.coplay_retention_days,
+            )
+        return reply
 
     def forget(self, inv: Invocation, user: int) -> Reply:
         p = self._gate(inv)

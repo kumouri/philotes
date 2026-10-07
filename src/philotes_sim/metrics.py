@@ -21,6 +21,7 @@ from .metric_helpers import (
     match_rate_metrics,
     newcomer_metrics,
     placement_metrics,
+    rejection_score,
     share,
 )
 from .sim import Record
@@ -360,7 +361,7 @@ def detection(rec: Record, by_player, by_pair, tpid) -> dict[str, float]:
             continue
         times = [t for t, _ in by_pair[(min(b, c), max(b, c))]]
         again = len(times) - bisect_right(times, t_end)
-        stat = -again / later_b  # higher = fewer re-encounters = "looks avoided"
+        stat = rejection_score(again, later_b, min_s)
         b_card = rec.first_cards.get((b, c), (0.0, None))[1]
         if kind in (SOFT, HARD):
             pos.append(stat)

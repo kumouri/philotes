@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Phase 0 exit criteria met** under the ruled async shape (batch at close, 7-day half-life, A8 ≤ 0.60 at M ≥ 100; §12, §14 #15). **Phase 1's build is complete pending live deployment** ([`phase1-bot.md`](phase1-bot.md)): core, Discord adapter, optional Archipelago automation, moderation and anonymous alpha measurement. It has never connected to Discord or served users. The host community is still undecided; hosting is ruled desktop-for-now (§14 #6). |
+| **Status** | **Phase 0 exit criteria met** under the ruled async shape (batch at close, 7-day half-life, A8 ≤ 0.60 at M ≥ 100; §12, §14 #15). **Phase 1's build is complete pending live deployment** ([`phase1-bot.md`](phase1-bot.md)): core, Discord adapter, optional Archipelago automation, moderation and anonymous alpha measurement, including A8 score histograms (ruled 2026-10-07, by picker). It has never connected to Discord or served users. The host community is still undecided; hosting is ruled desktop-for-now (§14 #6). |
 | **Spec version** | v0.1, 2026-09-24 (first draft) |
 | **Owner / decider** | Ceryce |
 | **Canonical source** | This file. Other formats are rendered from it. |
@@ -652,10 +652,10 @@ certainty uses a hard block or a report.
 are complete. The bot includes the core, Discord adapter, optional Archipelago automation,
 moderation review and aggregate alpha reports. Measurement preserves §11 retention rather than
 retaining historical individual sign-ups or card labels. Weekly per-player count summaries,
-newcomer milestones and transient co-signup snapshots make A5–A7 measurable; A8 is explicitly
-not measurable by design because historical avoid labels would defeat deletion.
+newcomer milestones and transient co-signup snapshots make A5–A7 measurable; A8 is measurable via anonymous card-time score histograms under the
+2026-10-07 01:02 CT ruling, by picker. Historical labels are never retained.
 [phase1-bot.md](phase1-bot.md) records the definitions and choices, including the limitations on
-A5–A7, A8's privacy-driven unavailability and voluntary graduation reporting. No live deployment or alpha has happened. The host community remains
+A5–A7, A8 detector timing differences and histogram error and voluntary graduation reporting. No live deployment or alpha has happened. The host community remains
 undecided; the hosting ruling is Ceryce's desktop for now. [SETUP.md](SETUP.md) has the host's
 steps, and [user-guide.md](user-guide.md) explains the player flow and honoured avoids.
 
@@ -710,3 +710,11 @@ asks for them:
 | 18 | Keep the newcomer boost and anchors? | **RULED 2026-10-06: drop both from v1** (Ceryce, "Drop both from v1"). Phase 0: no boost length beat off, and anchors fired but didn't measurably help newcomers ([phase0-results.md](phase0-results.md#newcomer-boost-decay-74-0-off--5--10--20--40-sessions-anchors-on-and-off)). Revisit only if alpha shows newcomers struggling. §7.4 keeps the design. | Ceryce |
 
 "Lean taken" rows were ruled by Ceryce on 2026-10-05 at 22:03 CT, by choosing "Take lean" for each of them in one picker over Telegram. Each row's lean text is the ruling. #3 was ruled the same evening, in her words. #9, #15 and #18 were ruled 2026-10-06 shortly after midnight CT, from Phase 0 follow-up pickers over Telegram. A8 within #15 was ruled 2026-10-06 at 22:38 CT and #8 at 22:39 CT, from two more Telegram pickers. #14 was ruled 2026-10-06 at 23:00 CT, in her words. Still open: which Discord server hosts the Phase 1 bot (#3), and by design #17 (before Phase 2).
+
+**A8 Phase 1 measurement ruling — 2026-10-07 01:02 CT, by picker:** Ceryce chose
+“Anonymous score histograms.” Consume labels at each card into avoided/not-avoided score
+histograms with no IDs or event rows. Estimate AUC with half-credit bin ties and report
+binning error. Weekly and cumulative retained aggregates preserve §11 deletion; suppress
+sparse periods. The bar remains `A8_BAR`. Implementation, calibration, and the precise
+retrospective live-versus-prospective simulator difference are recorded in
+[phase1-bot.md](phase1-bot.md#a8-anonymous-score-histograms-ruled-2026-10-07-0102-ct-by-picker).

@@ -18,6 +18,11 @@ from itertools import combinations
 from philotes_sim.edges import HARD, MORE, SOFT, soft_avoid_weight
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS alpha_a8 (
+    week REAL NOT NULL, avoided INTEGER NOT NULL CHECK(avoided IN (0,1)),
+    bin INTEGER NOT NULL CHECK(bin >= 0 AND bin < 256),
+    count INTEGER NOT NULL CHECK(count > 0), PRIMARY KEY(week, avoided, bin)
+);
 CREATE TABLE IF NOT EXISTS alpha_rates (
     user_id INTEGER NOT NULL, week REAL NOT NULL, entries INTEGER NOT NULL,
     placed INTEGER NOT NULL, PRIMARY KEY(user_id, week)
@@ -589,6 +594,7 @@ class Store:
                     "DELETE FROM edges WHERE author = ? AND target = ?", (e.author, e.target)
                 )
         cutoff = now - coplay_days * DAY
+        self.db.execute("DELETE FROM alpha_a8 WHERE week < ?", (cutoff,))
         self.db.execute("DELETE FROM alpha_rates WHERE week < ?", (cutoff,))
         self.db.execute("DELETE FROM alpha_newcomers WHERE joined_at < ?", (cutoff,))
         self.db.execute("DELETE FROM alpha_reunions WHERE closed_at < ?", (cutoff,))

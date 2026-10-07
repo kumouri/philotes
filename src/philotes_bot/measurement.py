@@ -23,10 +23,59 @@ from .config import BotConfig
 from .matching import Entry, edge_snapshot
 from .store import DAY, SignupRow, Store
 
-UNMEASURABLE = {
-    "A8": "not measurable by design: first-card avoid labels would survive soft-avoid "
-    "deletion/forget, violating §11 retention and user control. Current edges are not labels.",
-}
+
+def save_a8(store, author, observer, action, now, retention_days=365):
+    """Consume a card label immediately; never persist a labelled relationship."""
+    from philotes_sim.edges import HARD, SOFT
+    from philotes_sim.metric_helpers import rejection_score, score_bin
+
+    if action == "more":
+        return
+    history = [
+        (s, store.seed_members(s.id))
+        for s in store.seeds()
+        if now - retention_days * DAY <= s.ends_at < now
+    ]
+    shared = [s.ends_at for s, members in history if author in members and observer in members]
+    if not shared:
+        return
+    first = min(shared)
+    later = sum(observer in members and s.ends_at > first for s, members in history)
+    again = sum(t > first for t in shared)
+    score = rejection_score(again, later)
+    if math.isnan(score):
+        return
+    edge = store.edge(author, observer)
+    avoided = int(edge is not None and edge.kind in (HARD, SOFT))
+    store._exec(
+        "INSERT INTO alpha_a8 VALUES (?, ?, ?, 1) "
+        "ON CONFLICT(week, avoided, bin) DO UPDATE SET count = count + 1",
+        _week(now),
+        avoided,
+        score_bin(score),
+    )
+
+
+def a8_metrics(store, cutoff, start, end):
+    from philotes_sim.metric_helpers import (
+        A8_BINS,
+        A8_MIN_CLASS,
+        histogram_auc,
+        histogram_error_bound,
+    )
+
+    pos, neg = [0] * A8_BINS, [0] * A8_BINS
+    if store._one("SELECT name FROM sqlite_master WHERE name = 'alpha_a8'"):
+        for week, avoided, bin_, count in store._all("SELECT * FROM alpha_a8"):
+            if max(cutoff, start) <= week < end:
+                (pos if avoided else neg)[bin_] += count
+    suppressed = min(sum(pos), sum(neg)) < A8_MIN_CLASS
+    return {
+        "detect_auc": math.nan if suppressed else histogram_auc(pos, neg),
+        "A8_binning_error_bound": math.nan if suppressed else histogram_error_bound(pos, neg),
+        "A8_bins": A8_BINS,
+        "A8_calibration_max_error": 0.000058185,
+    }, None if suppressed else sum(pos) + sum(neg)
 
 
 def close_counts(store: Store, cfg: BotConfig, signups: list[SignupRow], formed, now: float):
@@ -186,6 +235,16 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
         {_week(r[1]) for r in rows}
         | {_week(s.formed_at) for s in seeds if s.formed_at >= cutoff}
         | graduation_weeks
+        | (
+            {
+                r[0]
+                for r in store._all(
+                    "SELECT week FROM alpha_a8 WHERE week >= ? AND week <= ?", cutoff, now
+                )
+            }
+            if store._one("SELECT name FROM sqlite_master WHERE name = 'alpha_a8'")
+            else set()
+        )
     )
     periods = [
         (datetime.fromtimestamp(t, UTC).date().isoformat(), t, t + 7 * DAY) for t in weeks
@@ -211,6 +270,8 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
             store, cutoff, start, min(end, now + 1)
         )
         metrics.update(history)
+        a8, history_samples["A8"] = a8_metrics(store, cutoff, start, min(end, now + 1))
+        metrics.update(a8)
         # Size is the current opted-in population, not sign-up count or guild membership.
         population = store._one("SELECT COUNT(*) FROM players WHERE removed_at IS NULL")[0]
         metrics["population.M"] = population
@@ -218,10 +279,14 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
             metrics.setdefault(criterion.metric, math.nan)
         criteria = experiments.check(metrics, "async")
         criteria["A2"] = "n/a"  # Ruled batch-at-close, even if an early manual close was used.
-        reasons = {key: reason for key, reason in UNMEASURABLE.items()}
+        reasons = {}
+        if criteria["A8"] == "n/a":
+            reasons["A8"] = (
+                "Suppressed: fewer than 10 events in either label class; no legacy backfill."
+            )
         reasons["A2"] = "Rolling cadence only; Phase 1 batches at close."
         if population < experiments.A8_BAR.min_M:
-            reasons["A8"] = f"n/a below M = {experiments.A8_BAR.min_M}. " + reasons["A8"]
+            reasons["A8"] = f"n/a below M = {experiments.A8_BAR.min_M}. " + reasons.get("A8", "")
         for key in ("A5", "A6", "A7"):
             if criteria[key] == "n/a":
                 reasons[key] = "Insufficient recorded history; legacy data is not backfilled."
@@ -280,7 +345,7 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
             {
                 "period": label,
                 "coverage": "retained data; A5/A7 since follow-up; "
-                "A6 new joiners only; no backfill",
+                "A6 new joiners only; A8 retrospective card-time score; no backfill",
                 **counts,
                 **{k: None if math.isnan(v) else v for k, v in metrics.items()},
                 **criteria,

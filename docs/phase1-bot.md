@@ -289,7 +289,7 @@ It never posts reports to the moderator channel or sends player messages.
 | A5 | Measurable from weekly per-player eligible-close and placement totals. The shared simulator reducer requires at least three entries per player in the selected period; n/a without eligible rates. No closed individual sign-ups, goals or size ranges are retained. |
 | A6 | Measurable for players joining after this upgrade: join time, completed seed history and first mutual-more milestone (time and completed-session count, no partner). Shared simulator reducer: success within three completed seeds; eligible after three seeds or an early success. Weekly cohorts join in that week, cumulative cohorts join within the retained period. Existing players are excluded rather than relabelled newcomers. Early mutual marks can have count zero (before the first seed ends); no assertion of actual play. |
 | A7 | Measurable: snapshot mutual-more state when the second player signs up, while the window is open. At close, count first-choice-compatible mutual pairs and same-seed hits, using the shared simulator ratio. Edits preserve original signup time/state; withdrawal discards the snapshot. Pairs carried together preserve their state with their signup times. Only anonymous close totals survive. Missing legacy snapshots make the criterion n/a, never a guessed denominator. |
-| A8 | **not measurable by design**: retaining first-card avoid labels after negligible soft avoids or forgotten marks are deleted would preserve precisely the sensitive relationship §11 deletes. No labels or historical avoid ledger are added. Current edges cannot substitute. Reads `experiments.A8_BAR` for both bar and M threshold: n/a below M = 100 and still n/a above it by design. |
+| A8 | Measurable via anonymous histograms; shared score formula, retrospective card-time history. See the dated ruling below for parity limits, suppression and binning error. |
 | Phase 1 repeat use | Counts placements of people who already appear in an earlier retained seed. Pass if at least one repeat placement exists, fail if there are seats but none repeat, n/a without seats. |
 | Phase 1 reunions | Counts unordered co-player pair events with an earlier retained co-match. Same observed/nonzero test as repeat use. This is reunion formation, not an assertion of actual play or mutual preference. |
 | Phase 1 graduation | Optional `/graduated confirm:true` self-report, one per opted-in account; no names, members, links or third-party telemetry. Counts reporters, not distinct groups. Pass on an observed report, n/a without one. Inactivity and `/leave` are never evidence. Overall passes when repeat use, reunions and reported graduation pass; fails if an observed component fails. |
@@ -300,7 +300,7 @@ The ruled criteria checks are the simulator's `experiments.check`, not copied th
 Exports use the same metric column names as Phase 0's `summary.csv`; unavailable numbers are
 JSON null / blank CSV cells. Each A1–A8 check has pass / FAIL / n/a, a sample size (null if no
 valid denominator exists), and a reason for n/a. **There is no claim that the live alpha meets
-Phase 0's criteria while A8 is unavailable.** The bot has no synthetic ground-truth enjoyment,
+Phase 0's exact detector: A8 uses the qualified proxy below.** The bot has no synthetic ground-truth enjoyment,
 actual played hours, counterfactual friendship or off-platform telemetry, and none is invented.
 
 ### Choices where the spec is silent
@@ -360,8 +360,7 @@ individual observations. Identifiable rows disappear on `/leave`; anonymous clos
 until expiry. A6 cohorts expire by join date. No legacy denominators, mutual timing, cohorts or
 co-signup states are fabricated. Weekly A5 may be n/a for a normal one-close week because its
 three-entry minimum is deliberately unchanged; cumulative A5 becomes measurable after three
-eligible closes. A8 remains n/a by design even after sufficient population/history: its ruled bar
-is unchanged, and the alpha cannot claim to satisfy all A1–A8.
+eligible closes. A8 is measurable prospectively via the qualified card-time proxy below.
 
 Offline tests cover known ratios and fail cases, cross-goal lockout, insufficient samples,
 unknown searches, insufficient-history criteria, the A8 constant, repeat use and reunions, gates,
@@ -375,3 +374,45 @@ to choose the 18+ host community/moderators, configure her desktop and a private
 server, then follow [SETUP.md](SETUP.md) for Discord/AP acceptance testing before inviting players.
 The voluntary `/graduated` check and banter-tolerance trial happen during alpha. Member-driven
 seed early ending/extending remains a lifecycle follow-up, not part of this five-slice build.
+
+
+### A8 anonymous score histograms (ruled 2026-10-07 01:02 CT, by picker)
+
+Ceryce chose **“Anonymous score histograms.”** At each successful neutral/avoid/block
+card response, consume the current label and increment one of 256 uniform bins on [-1, 0].
+`more` and report actions are excluded. No response is not a neutral label. Repeated card
+responses are observations, not distinct pairs; no deduplication ledger is kept.
+
+The shared simulator `rejection_score` computes negative re-encounters / later sessions,
+requiring three later sessions. Exact prospective first-card parity is impossible without
+retaining labels: live instead uses completed retained seeds after the earliest retained
+shared seed, up to the response. The simulator uses session start times after the original
+first-card session end, a historical first-card label and the end-of-run horizon. Live uses
+seed end times, the current card label and response-time horizon. Seeds are formation/completion
+records, not proof of play. Retention can shift the earliest shared seed. This is a faithful
+observable-frequency proxy, not a directly comparable reproduction of Phase 0 A8.
+
+Storage is only UTC Monday reporting week, avoided boolean, bin and count; no IDs, pair keys,
+individual scores, event rows or fine timestamps. Cumulative histograms are sums of retained
+weekly histograms, not a second permanent ledger. Whole weeks expire conservatively at configured
+co-play retention; reports filter expiry even before purge. Anonymous counts survive `/forget`
+and `/leave` because no relationship or identity is available to delete or reconstruct.
+
+Every report/export/mod metrics suppresses A8 AUC, error and sample size unless BOTH classes
+have at least ten events in the selected period (including cumulative). Histograms are never
+exported. Aggregation is many-to-one and cannot uniquely reconstruct contributors; this is not
+differential privacy or a guarantee against an observer with auxiliary knowledge and repeated
+report access. Small-count suppression reduces sparse-output disclosure, not all differencing risk.
+
+AUC counts within-bin ties as half and reads `A8_BAR` (≤ 0.60; n/a below M = 100).
+The simulator supplies no A8 confidence interval; its sweep reports replicate variability.
+Reports print a conservative absolute binning-error bound: half the fraction of positive-negative
+comparisons in the same bin, including genuine ties. This bound can be much larger than actual error.
+No sampling-confidence claim is made and the bar uses the point estimate.
+
+Offline calibration (`uv run python scripts/a8_calibration.py`): Phase 0 `async-density`,
+M=100, batch at close, seven-day half-life, original cap 5, 26 weeks/four burn-in, seeds 1–5.
+Exact/binned AUC respectively: 0.589769701/0.589795089, 0.581470058/0.581460778,
+0.587032553/0.587002178, 0.590329032/0.590272083, 0.587278234/0.587220050.
+Maximum absolute error 0.000058185; mean 0.000036035. 256 bins therefore add less than
+0.00006 AUC on these runs, at small bounded storage cost; this is empirical, not a universal bound.
