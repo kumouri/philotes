@@ -651,9 +651,11 @@ certainty uses a hard block or a report.
 **As built** (2026-10-07, [`src/philotes_bot/`](../src/philotes_bot/)): all five build slices
 are complete. The bot includes the core, Discord adapter, optional Archipelago automation,
 moderation review and aggregate alpha reports. Measurement preserves §11 retention rather than
-retaining historical individual sign-ups or card labels; unavailable tests are explicitly n/a.
+retaining historical individual sign-ups or card labels. Weekly per-player count summaries,
+newcomer milestones and transient co-signup snapshots make A5–A7 measurable; A8 is explicitly
+not measurable by design because historical avoid labels would defeat deletion.
 [phase1-bot.md](phase1-bot.md) records the definitions and choices, including the limitations on
-A5–A8 and graduation. No live deployment or alpha has happened. The host community remains
+A5–A7, A8's privacy-driven unavailability and voluntary graduation reporting. No live deployment or alpha has happened. The host community remains
 undecided; the hosting ruling is Ceryce's desktop for now. [SETUP.md](SETUP.md) has the host's
 steps, and [user-guide.md](user-guide.md) explains the player flow and honoured avoids.
 

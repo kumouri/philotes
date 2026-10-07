@@ -497,6 +497,21 @@ class Bot:
 
     # --- your data (§11) -------------------------------------------------------------------
 
+    def graduated(self, inv: Invocation, confirm: bool = False) -> Reply:
+        p = self._gate(inv)
+        if isinstance(p, Reply):
+            return p
+        if not confirm:
+            return _err(
+                "Optionally report that a group you found through Philotes now plays in "
+                "its own server/chat: /graduated confirm:true. No names, links or members "
+                "are collected. One report per account; /leave erases it."
+            )
+        self.store._exec(
+            "INSERT OR IGNORE INTO alpha_graduations VALUES (?, ?)", inv.user_id, self.clock()
+        )
+        return Reply("Thank you. Your voluntary graduation report is counted anonymously.")
+
     def mydata(self, inv: Invocation) -> Reply:
         p = self.store.player(inv.user_id)
         if p is None:
@@ -506,6 +521,12 @@ class Bot:
         w = self.store.open_window()
         signup = self.store.signup(w[0], inv.user_id) if w else None
         data = {
+            "your_alpha_placement_totals": self.store._all(
+                "SELECT week, entries, placed FROM alpha_rates WHERE user_id = ?", inv.user_id
+            ),
+            "your_graduation_report": self.store._one(
+                "SELECT t FROM alpha_graduations WHERE user_id = ?", inv.user_id
+            ),
             "your_archipelago_yamls": [
                 {"seed": sid, "yaml": content.decode("utf-8")}
                 for sid, content in self.store._all(
@@ -748,9 +769,10 @@ class Bot:
     def _close_and_form(self, wid: int, now: float) -> int:
         signups = self.store.signups(wid)
         formed = form_seeds(self.store, self.cfg, signups, now, self.rng)
-        from .measurement import close_counts, save_close
+        from .measurement import close_counts, save_close, save_history
 
         counts = close_counts(self.store, self.cfg, signups, formed, now)
+        save_history(self.store, wid, now, signups, formed)
         w = self.cfg.window
         for goal, members in formed:
             days = w.goal_days[goal]
@@ -805,6 +827,7 @@ class Bot:
                 self.transport.send_dm(u, Message(mention(o), card_buttons(seed_id, o)))
         self.store.add_seeds_played(members)
         self.store.mark_cards_sent(seed_id)
+        self.store.sample_first_mutual(self.clock())
 
 
 def _iso(t: float) -> str:

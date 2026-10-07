@@ -81,8 +81,9 @@ def test_all_na_reasons_and_ruled_bar(monkeypatch):
     w = world()
     row = report(w.store, w.bot.cfg, w.clock.t)[-1]
     assert all(row[f"A{i}"] == "n/a" for i in range(1, 9))
-    for key in ("A5", "A6", "A7", "A8"):
-        assert "not measurable on live data" in row["reasons"][key]
+    for key in ("A5", "A6", "A7"):
+        assert "Insufficient" in row["reasons"][key]
+    assert "not measurable by design" in row["reasons"]["A8"]
     assert "Rolling cadence" in row["reasons"]["A2"]
     monkeypatch.setattr(experiments, "A8_BAR", experiments.AucBar(0.57, 2))
     assert "M = 2" in report(w.store, w.bot.cfg, w.clock.t)[-1]["reasons"]["A8"]
@@ -187,10 +188,163 @@ def test_cli_readonly_legacy_and_no_database_creation(tmp_path, capsys):
     assert main(["metrics", "--db", str(db), "--out", str(output)]) == 0
     assert db.read_bytes() == before
     assert json.loads(output.read_text())[-1]["A1"] == "n/a"
-    assert "not measurable on live data" in capsys.readouterr().out
+    assert "not measurable by design" in capsys.readouterr().out
     missing = tmp_path / "missing.db"
     with pytest.raises(SystemExit):
         main(["metrics", "--db", str(missing)])
     assert not missing.exists()
     with pytest.raises(SystemExit):
         main(["metrics", "--db", str(db), "--out", str(db)])
+
+
+def test_multiweek_measured_followup_history(tmp_path):
+    from philotes_bot.measurement import save_history
+    from philotes_sim.metric_helpers import match_rate_metrics, newcomer_metrics
+
+    w = world()
+    base = w.clock.t
+    ids = [987654321012345600 + n for n in range(4)]
+    for u in ids:
+        w.store.add_player(u, base)
+    # Three completed seeds; two of four newcomers succeed within the horizon.
+    for week in range(3):
+        t = base + week * 7 * DAY
+        wid = w.store.create_window(t, t + DAY)
+        members = ids if week == 0 else ids[:3]
+        if week == 1:
+            w.store.set_edge(ids[0], ids[1], MORE, t)
+            w.store.set_edge(ids[1], ids[0], MORE, t)
+        signups = [SignupRow(wid, u, (0,), (3, 4), (3, 4), t) for u in ids]
+        for signup in signups:
+            w.store.upsert_signup(signup)
+        # Change edges after co-signup: denominator must retain the snapshot.
+        if week == 1:
+            w.store.clear_edge(ids[1], ids[0])
+        formed = [(0, members)]
+        save_history(w.store, wid, t + DAY, signups, formed)
+        save_history(w.store, wid, t + DAY, signups, formed)  # idempotent
+        save_close(w.store, wid, t + DAY, close_counts(w.store, w.bot.cfg, signups, formed, t))
+        w.store.create_seed(0, members, t + DAY, t + 2 * DAY)
+        w.store.move_signups(wid, wid + 1000, [])
+    # Give the fourth newcomer enough completed seeds to be censored as a failure.
+    w.store.create_seed(0, [ids[3]], base + 3 * DAY, base + 4 * DAY)
+    w.store.create_seed(0, [ids[3]], base + 5 * DAY, base + 6 * DAY)
+    w.clock.t = base + 22 * DAY
+    for u in range(1000, 1096):
+        w.store.add_player(u, base)
+    row = report(w.store, w.bot.cfg, w.clock.t)[-1]
+    expected = match_rate_metrics([(3, 3)] * 3 + [(3, 1)])
+    assert row["match_rate_p10_over_median"] == expected["match_rate_p10_over_median"]
+    assert row["sample_sizes"]["A5"] == 4
+    assert (
+        row["newcomer_within_horizon_share"]
+        == newcomer_metrics([(3, 1)] * 2 + [(3, None)] * 2, 3)["newcomer_within_horizon_share"]
+    )
+    assert row["sample_sizes"]["A6"] == 4
+    assert row["cosignup_reunion_share"] == 1
+    assert row["sample_sizes"]["A7"] == 1
+    assert row["population.M"] == 100
+    assert row["A8"] == "n/a" and row["detect_auc"] is None
+    assert "not measurable by design" in row["reasons"]["A8"]
+    assert not w.store._all("SELECT * FROM alpha_pending_pairs")
+    assert not w.store._all("SELECT * FROM signups")
+    assert not w.store._one("SELECT name FROM sqlite_master WHERE name = 'alpha_first_cards'")
+    assert all(str(u) not in render([row]) for u in ids)
+    own = w.run(ids[1], "mydata").text
+    assert "first_mutual" not in own and "alpha_pending" not in own
+    assert not w.run(ids[0], "graduated").ok
+    assert w.run(ids[0], "graduated", confirm=True).ok
+    assert w.run(ids[0], "graduated", confirm=True).ok
+    row = report(w.store, w.bot.cfg, w.clock.t)[-1]
+    assert row["success"]["graduation_reports"] == 1
+    assert row["success"]["overall"] == "pass"
+    w.store.delete_player(ids[0])
+    for table in ("alpha_rates", "alpha_newcomers", "alpha_graduations"):
+        assert not w.store._one(f"SELECT 1 FROM {table} WHERE user_id = ?", ids[0])
+    w.clock.t += 366 * DAY
+    assert report(w.store, w.bot.cfg, w.clock.t)[-1]["sample_sizes"]["A6"] == 0
+    w.store.purge(w.clock.t, 7, 0.01, 365)
+    for table in ("alpha_rates", "alpha_newcomers", "alpha_reunions", "alpha_graduations"):
+        assert not w.store._all(f"SELECT * FROM {table}")
+
+
+def test_additive_old_schema_migration_and_legacy_snapshots(tmp_path):
+    from philotes_bot.measurement import save_history
+
+    path = tmp_path / "old.db"
+    store = Store(str(path))
+    store.add_player(123, 0)
+    store.upsert_signup(SignupRow(1, 123, (0,), (2, 2), (2, 2), 0))
+    store.add_player(456, 0)
+    store.upsert_signup(SignupRow(1, 456, (0,), (2, 2), (2, 2), 0))
+    store.set_edge(123, 456, HARD, 0)
+    for (name,) in store._all("SELECT name FROM sqlite_master WHERE name LIKE 'alpha_%'"):
+        if name != "alpha_windows":
+            store.db.execute(f"DROP TABLE {name}")
+    store.db.commit()
+    store.close()
+    store = Store(str(path))
+    assert store.player(123) and store.edge(123, 456).kind == HARD
+    assert len(store.signups(1)) == 2
+    assert not store._all("SELECT * FROM alpha_newcomers")  # no invented newcomer history
+    save_history(store, 1, 1, store.signups(1), [])
+    row = report(store, world().bot.cfg, 1)[-1]
+    assert row["A7"] == "n/a" and "incomplete denominator" in row["reasons"]["A7"]
+    store.close()
+    Store(str(path)).close()  # migration is repeatable
+
+
+def test_a6_completed_seed_horizon_and_cohort_as_of_week():
+    w = world()
+    u, v = 101, 102
+    w.store.add_player(u, w.clock.t)
+    w.store.add_player(v, w.clock.t)
+    end = w.clock.t + 3 * DAY
+    sid = w.store.create_seed(0, [u, v], w.clock.t, end)
+    w.store.set_edge(u, v, MORE, w.clock.t)
+    w.store.set_edge(v, u, MORE, w.clock.t)
+    assert w.store._one(
+        "SELECT first_mutual_session FROM alpha_newcomers WHERE user_id = ?", u
+    ) == (0,)
+    w.clock.t = end
+    w.store.sample_first_mutual(end)
+    assert w.store._one(
+        "SELECT first_mutual_session FROM alpha_newcomers WHERE user_id = ?", u
+    ) == (0,)
+    row = report(w.store, w.bot.cfg, w.clock.t)[-1]
+    assert row["newcomer_within_horizon_share"] == 1
+    assert row["sample_sizes"]["A6"] == 2
+    assert w.store.seed(sid)
+
+
+def test_cosignup_snapshots_survive_carry_edits_and_end_on_withdrawal():
+    w = world()
+    for u in (1, 2, 3):
+        w.store.add_player(u, w.clock.t)
+    w.store.set_edge(1, 2, MORE, w.clock.t)
+    w.store.set_edge(2, 1, MORE, w.clock.t)
+    for u in (1, 2):
+        w.store.upsert_signup(SignupRow(11, u, (0,), (2, 2), (2, 2), w.clock.t))
+    w.store.clear_edge(2, 1)
+    w.store.upsert_signup(SignupRow(11, 2, (0, 1), (2, 3), (2, 3), w.clock.t))
+    assert w.store._one("SELECT mutual FROM alpha_pending_pairs WHERE window_id = 11") == (1,)
+    w.store.move_signups(11, 12, [1, 2])
+    assert w.store._one("SELECT mutual FROM alpha_pending_pairs WHERE window_id = 12") == (1,)
+    assert not w.store._all("SELECT * FROM alpha_pending_pairs WHERE window_id = 11")
+    w.store.delete_signup(12, 2)
+    assert not w.store._all("SELECT * FROM alpha_pending_pairs")
+    w.store.upsert_signup(SignupRow(12, 2, (0,), (2, 2), (2, 2), w.clock.t + DAY))
+    assert w.store._one("SELECT mutual FROM alpha_pending_pairs") == (0,)
+    w.store.delete_user_signups(1)
+    assert not w.store._all("SELECT * FROM alpha_pending_pairs")
+
+
+def test_weekly_newcomers_do_not_count_future_seed_completions():
+    w = world()
+    w.store.add_player(101, w.clock.t)
+    for _ in range(3):
+        w.store.create_seed(0, [101], w.clock.t, w.clock.t + DAY)
+    rows = report(w.store, w.bot.cfg, w.clock.t)
+    assert len(rows) == 2
+    assert all(row["sample_sizes"]["A6"] == 0 for row in rows)
+    assert all(row["A6"] == "n/a" for row in rows)

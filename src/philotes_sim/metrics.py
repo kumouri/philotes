@@ -16,7 +16,13 @@ import numpy as np
 
 from .config import MINUTES_PER_DAY, MINUTES_PER_HOUR, MINUTES_PER_WEEK
 from .edges import HARD, MORE, SOFT
-from .metric_helpers import placement_metrics, share
+from .metric_helpers import (
+    cosignup_metrics,
+    match_rate_metrics,
+    newcomer_metrics,
+    placement_metrics,
+    share,
+)
 from .sim import Record
 
 HALL_CASUAL_FRIEND_HOURS = 50.0  # §2: Hall (2018)
@@ -244,15 +250,7 @@ def compute(rec: Record) -> dict[str, float]:
     per_ent: dict[int, list[bool]] = defaultdict(list)
     for e in organic:
         per_ent[e.pid].append(e.placed_t is not None)
-    rates_p = [sum(v) / len(v) for v in per_ent.values() if len(v) >= 3]
-    if rates_p:
-        m["match_rate_p10"] = float(np.percentile(rates_p, 10))
-        m["match_rate_median"] = float(np.median(rates_p))
-        m["match_rate_p10_over_median"] = (
-            m["match_rate_p10"] / m["match_rate_median"] if m["match_rate_median"] > 0 else 0.0
-        )
-    else:
-        m["match_rate_p10"] = m["match_rate_median"] = m["match_rate_p10_over_median"] = math.nan
+    m.update(match_rate_metrics([(len(v), sum(v)) for v in per_ent.values()]))
     aff: dict[int, list[float]] = defaultdict(list)
     for s in measured_sessions:
         for p in s.members:
@@ -286,12 +284,6 @@ def compute(rec: Record) -> dict[str, float]:
     # Newcomers / anchors: sessions until a newcomer's first mutual `more`.
     horizon = 5 if live else 3
     newcomers = [p for p in rec.players.values() if p.measured_newcomer]
-    eligible = [
-        p
-        for p in newcomers
-        if p.sessions >= horizon
-        or (p.first_mutual_session is not None and p.first_mutual_session <= horizon)
-    ]
     # Mechanism check for §7.4: how often a newcomer's first sessions include an anchor.
     nc = {p.pid for p in newcomers}
     early: dict[int, list[bool]] = defaultdict(list)
@@ -301,11 +293,7 @@ def compute(rec: Record) -> dict[str, float]:
                 early[p].append(any(rec.players[o].anchor for o in s.members if o != p))
     flags = [f for v in early.values() for f in v]
     m["newcomer_early_sessions_with_anchor"] = _share(flags)
-    m["newcomers"] = len(newcomers)
-    m["newcomers_eligible"] = len(eligible)
-    m["newcomer_within_horizon_share"] = _share(
-        [p.first_mutual_session is not None and p.first_mutual_session <= horizon for p in eligible]
-    )
+    m.update(newcomer_metrics([(p.sessions, p.first_mutual_session) for p in newcomers], horizon))
     firsts = [
         float(p.first_mutual_session) if p.first_mutual_session is not None else math.inf
         for p in newcomers
@@ -437,7 +425,7 @@ def cosignup_reunion(rec: Record, first_choice: bool = True) -> float:
                 continue
             tries += 1
             hits += ea.sid is not None and ea.sid == eb.sid
-    return hits / tries if tries else math.nan
+    return cosignup_metrics(tries, hits)["cosignup_reunion_share"]
 
 
 def lockout_by_n(rec: Record) -> list[dict[str, float | str]]:

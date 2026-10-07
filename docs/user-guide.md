@@ -78,3 +78,20 @@ or real name.
 The bot only DMs you for two things: when your seed forms, and the card when it ends. When
 automation is enabled, one YAML reminder (24 hours by default) and generation/room updates go
 to the private seed channel without pings.
+
+## When your group graduates
+
+If a group you found through Philotes now plays in its own server or chat, that counts as
+success. Optionally use `/graduated`, then `/graduated confirm:true` to report it. We keep only
+your account ID and submission time, once per account, so you can view it with `/mydata` and
+delete it with `/leave`. We collect no group members, names or links. Reports show only aggregate
+reporter counts; several members reporting the same group can count separately. Not reporting,
+inactivity and leaving are never treated as evidence that your group graduated.
+
+Alpha measurement also keeps your weekly signup/placement totals and a private newcomer
+milestone (first mutual-more time and completed-seed count, without naming the partner).
+Mutual milestones and temporary co-signup states are never disclosed, including in `/mydata`,
+because they could reveal someone else's mark. Weekly totals and graduation reports are included
+in your own data. These summaries expire within the co-play retention horizon; leaving removes
+your identifiable summaries. Anonymous close totals remain until expiry. We keep no historical
+avoid/card labels after deletion to measure silent rejection.
