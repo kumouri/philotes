@@ -24,6 +24,7 @@ import numpy as np
 from philotes_sim.edges import HARD, MORE, SOFT, soft_avoid_weight
 
 from . import text
+from .archipelago import Automation
 from .config import BotConfig
 from .matching import form_seeds
 from .store import DAY, PlayerRow, SignupRow, Store
@@ -119,6 +120,31 @@ class Bot:
         self.transport = transport
         self.clock = clock
         self.rng = rng if rng is not None else np.random.default_rng()
+        self.archipelago = Automation(cfg, store, transport)
+
+    def yaml_permission(self, inv: Invocation, seed: int) -> Reply:
+        p = self._gate(inv)
+        if isinstance(p, Reply):
+            return p
+        try:
+            self.archipelago.permission(seed, inv.user_id, self.clock())
+        except ValueError as exc:
+            return _err(str(exc))
+        return Reply("Ready for YAML.")
+
+    def submit_yaml(self, inv: Invocation, seed: int, file: bytes) -> Reply:
+        allowed = self.yaml_permission(inv, seed)
+        if not allowed.ok:
+            return allowed
+        try:
+            self.archipelago.submit(seed, inv.user_id, file, self.clock())
+        except (ValueError, OSError) as exc:
+            return _err(str(exc) if isinstance(exc, ValueError) else "Unable to save YAML on host.")
+        return Reply("YAML accepted. You can replace it until generation starts or the deadline.")
+
+    def close(self) -> None:
+        self.archipelago.close()
+        self.store.close()
 
     # --- helpers ---------------------------------------------------------------------------
 
@@ -331,6 +357,21 @@ class Bot:
             lines.append(
                 f"Seed #{x.id} ({self._goal_name(x.goal)}), {where}, runs until {ts(x.ends_at)}."
             )
+            job = self.archipelago.job(x.id)
+            if job:
+                submitted = (
+                    self.store._one(
+                        "SELECT 1 FROM ap_yamls WHERE seed_id = ? AND user_id = ?",
+                        x.id,
+                        inv.user_id,
+                    )
+                    is not None
+                )
+                lines.append(
+                    f"Archipelago: {job['status']}; your YAML: "
+                    f"{'submitted' if submitted else 'missing'}; "
+                    f"submission deadline {ts(job['deadline'])}."
+                )
         if p.removed_at is not None:
             lines.append("Moderators have removed you from matching.")
         return Reply("\n".join(lines))
@@ -465,6 +506,12 @@ class Bot:
         w = self.store.open_window()
         signup = self.store.signup(w[0], inv.user_id) if w else None
         data = {
+            "your_archipelago_yamls": [
+                {"seed": sid, "yaml": content.decode("utf-8")}
+                for sid, content in self.store._all(
+                    "SELECT seed_id, content FROM ap_yamls WHERE user_id = ?", inv.user_id
+                )
+            ],
             "user_id": str(p.user_id),
             "joined_at": _iso(p.joined_at),
             "style": style_names(p.style),
@@ -524,9 +571,13 @@ class Bot:
         if not confirm:
             return _err(
                 "This deletes your profile, sign-up, seed history and every mark set by you or "
-                "about you. Reports you filed stay with the moderators. Run `/leave confirm:true` "
+                "about you, plus your submitted YAMLs. If your YAML has been generated, the "
+                "whole local room and its generated files/channel are deleted because they "
+                "combine player data. Downloaded or third-party copies cannot be recalled. "
+                "Reports you filed stay with the moderators. Run `/leave confirm:true` "
                 "to go ahead."
             )
+        self.archipelago.forget(inv.user_id)
         self.store.delete_player(inv.user_id)
         return Reply("Done. Everything about you is deleted. You can /join again any time.")
 
@@ -596,6 +647,7 @@ class Bot:
         wid, _, closes = self._window(now)
         if closes <= now:
             self._close_and_form(wid, now)
+        self.archipelago.tick(now)
         horizon = self.cfg.safety.recently_played_days * DAY
         for s in self.store.seeds():
             if not s.cards_sent and s.ends_at <= now:
@@ -620,9 +672,17 @@ class Bot:
             welcome = text.SEED_CHANNEL_WELCOME.format(
                 seed=sid, goal=name, days=days, mentions=", ".join(mention(m) for m in members)
             )
+            if self.cfg.archipelago.enabled:
+                welcome = welcome.replace(
+                    "Share your Archipelago YAMLs here and pick one person to generate "
+                    "and host the seed.",
+                    "The bot will collect player YAMLs and generate and host the seed.",
+                )
             chan = f"seed-{sid}-{name}"
             cid = self.transport.create_seed_channel(chan, members, Message(welcome))
             self.store.set_seed_channel(sid, cid)
+            if self.cfg.archipelago.enabled:
+                self.archipelago.formed(self.store.seed(sid))
             where = f"<#{cid}>" if cid is not None else "being set up by the moderators"
             for m in members:
                 self.transport.send_dm(

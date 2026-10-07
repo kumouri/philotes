@@ -1,8 +1,8 @@
 """What the bot needs from a chat platform, and an in-memory implementation of it.
 
-The core (``core.py``) never imports a Discord library. It calls a ``Transport`` for the four
-side effects the §9.3 MVP needs: DM a player, create a private seed channel for its members, remove
-that channel, and post into the moderators' channel. Slash-command replies are return values, not
+The core (``core.py``) never imports a Discord library. It calls a ``Transport`` to DM a player,
+create a private seed channel for its members, remove that channel, post seed updates/files,
+and post into the moderators' channel. Slash-command replies are return values, not
 transport calls.
 
 ``InMemoryTransport`` records every call and is what the tests and the local console use. It never
@@ -12,6 +12,7 @@ touches the network. The Discord gateway transport is in discord_adapter.py (doc
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
 
@@ -25,6 +26,7 @@ class Button:
 class Message:
     text: str
     buttons: tuple[Button, ...] = ()
+    files: tuple[Path, ...] = ()
 
 
 class Transport(Protocol):
@@ -37,6 +39,8 @@ class Transport(Protocol):
         ...
 
     def delete_channel(self, channel_id: int) -> None: ...
+
+    def post_seed(self, channel_id: int, message: Message) -> bool: ...
 
     def post_mod(self, message: Message) -> bool:
         """Post to the host community's private moderators' channel (§10)."""
@@ -86,6 +90,13 @@ class InMemoryTransport:
 
     def post_mod(self, message: Message) -> bool:
         self.mod_posts.append(message)
+        return True
+
+    def post_seed(self, channel_id: int, message: Message) -> bool:
+        channel = self.channels.get(channel_id)
+        if channel is None or channel.deleted:
+            return False
+        channel.messages.append(message)
         return True
 
     def dms_to(self, user_id: int) -> list[Message]:

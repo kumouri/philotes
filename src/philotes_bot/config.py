@@ -16,6 +16,7 @@ seeds formed in one batch when the sign-up window closes (§14 #15).
 from __future__ import annotations
 
 import dataclasses
+import math
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -61,10 +62,35 @@ class Safety:
 
 
 @dataclass(frozen=True)
+class Archipelago:
+    enabled: bool = False
+    version: str = "0.6.8"
+    install_path: str = ""
+    games_manifest: str = ""  # trusted offline export from this install
+    data_path: str = "philotes-seeds"
+    generator_command: tuple[str, ...] = ("ArchipelagoGenerate.exe",)
+    server_command: tuple[str, ...] = ("ArchipelagoServer.exe",)
+    submission_hours: float = 48
+    reminder_hours: float = 24
+    max_yaml_bytes: int = 65536
+    generation_timeout_seconds: float = 600
+    max_artifact_bytes: int = 100 * 1024 * 1024
+    hosting_mode: str = "self_host"
+    upload_enabled: bool = False  # Ceryce's explicit opt-in, separate from mode
+    public_host: str = "localhost"
+    bind_host: str = "127.0.0.1"
+    port_start: int = 38281
+    port_end: int = 38300
+    restart_seconds: float = 60
+    max_restarts: int = 3
+
+
+@dataclass(frozen=True)
 class BotConfig:
     community: Community = field(default_factory=Community)
     window: Window = field(default_factory=Window)
     safety: Safety = field(default_factory=Safety)
+    archipelago: Archipelago = field(default_factory=Archipelago)
     db_path: str = "philotes.db"
     discord_token: str | None = field(default=None, repr=False)
 
@@ -123,6 +149,7 @@ def load_config(
         community=_section(Community, data.get("community", {})),
         window=_section(Window, data.get("window", {})),
         safety=_section(Safety, data.get("safety", {})),
+        archipelago=_section(Archipelago, data.get("archipelago", {})),
         db_path=str(data.get("db_path", "philotes.db")),
         discord_token=token,
     )
@@ -131,6 +158,39 @@ def load_config(
 
 
 def validate(cfg: BotConfig) -> None:
+    a = cfg.archipelago
+    if type(a.enabled) is not bool or type(a.upload_enabled) is not bool:
+        raise ValueError("Archipelago enabled and upload_enabled must be TOML booleans")
+    if a.hosting_mode not in {"self_host", "upload"}:
+        raise ValueError("archipelago.hosting_mode must be self_host or upload")
+    if a.enabled and (not a.install_path or not a.games_manifest):
+        raise ValueError("Archipelago needs install_path and games_manifest")
+    if a.enabled and a.hosting_mode == "upload" and not a.upload_enabled:
+        raise ValueError("Upload requires explicit archipelago.upload_enabled = true")
+    if not 0 < a.reminder_hours < a.submission_hours:
+        raise ValueError("Archipelago reminder must precede the positive submission deadline")
+    if (
+        any(
+            not math.isfinite(v) or v <= 0
+            for v in (
+                a.max_yaml_bytes,
+                a.generation_timeout_seconds,
+                a.max_artifact_bytes,
+                a.restart_seconds,
+            )
+        )
+        or a.max_restarts < 0
+    ):
+        raise ValueError("Archipelago limits must be positive; max_restarts must be nonnegative")
+    if not 1 <= a.port_start <= a.port_end <= 65535:
+        raise ValueError("Archipelago ports must be within 1..65535")
+    for command in (a.generator_command, a.server_command):
+        if (
+            not isinstance(command, tuple)
+            or not command
+            or any(not isinstance(c, str) or not c for c in command)
+        ):
+            raise ValueError("Archipelago commands must be nonempty arrays of strings")
     w = cfg.window
     if len(w.goals) != len(w.goal_days) or not w.goals:
         raise ValueError("window.goals and window.goal_days must be the same, non-zero length")

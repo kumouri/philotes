@@ -21,7 +21,8 @@ JOIN = (
     "who you liked playing with so you can end up together again. To join, confirm that you are "
     "18 or older: `/join adult:true`.\n\n"
     "What we keep: your Discord user ID, your sign-ups, the style and interests you set, the "
-    "marks you set on people you played with, who you've been in seeds with, and any reports. "
+    "marks you set on people you played with, who you've been in seeds with, any reports, "
+    "and submitted player YAMLs and generated Archipelago files when automation is enabled. "
     "Nobody can see your marks, including the people they're about. `/mydata` shows all of it "
     "and `/leave` deletes it."
 )
@@ -34,13 +35,15 @@ HELP = (
     "`/signup` — sign up for this week's seeds: goal lengths you're up for and seed sizes.\n"
     "`/withdraw` — take your sign-up back.\n"
     "`/status` — your sign-up, and your seeds.\n"
+    "`/yaml seed:<number> file:<attachment>` — submit a player YAML when automation is enabled.\n"
     "`/recent` — people you've played with lately, to mark **more**, **avoid**, **block** or "
     "**report**.\n"
     "`/forget` — clear a mark you set (frees a block slot).\n"
     "`/report` — report someone you played with to this community's moderators.\n"
     "`/mydata` — everything we hold about you. `/leave` — delete it all.\n\n"
     "Seeds form once a week, when the sign-up window closes. You only hear from the bot when "
-    "your seed forms and when it ends.\n\n" + AVOIDS_HONOURED
+    "your seed forms and when it ends by DM. YAML reminders and room details stay in the seed "
+    "channel.\n\n" + AVOIDS_HONOURED
 )
 
 CARD_HEADER = (

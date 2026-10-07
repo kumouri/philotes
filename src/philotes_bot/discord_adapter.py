@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import discord
 from discord import app_commands
 
-from .commands import BOOL, COMMANDS, INT, STR, USER, UsageError, dispatch
+from .commands import ATTACHMENT, BOOL, COMMANDS, INT, STR, USER, UsageError, dispatch
 from .config import BotConfig
 from .core import Bot, Invocation, Reply, parse_card_id
 from .store import Store
@@ -30,6 +30,10 @@ def message_kwargs(message):
         for button in message.buttons:
             view.add_item(CardButton(button.custom_id, button.label))
         kwargs["view"] = view
+    if message.files:
+        kwargs["files"] = [discord.File(str(path)) for path in message.files]
+        if "file" in kwargs:
+            kwargs["files"].append(kwargs.pop("file"))
     return kwargs
 
 
@@ -80,11 +84,33 @@ class Adapter:
 
     async def command(self, interaction, name, args):
         await interaction.response.defer(ephemeral=True, thinking=True)
+        if name == "yaml":
+            await self.yaml(interaction, args)
+            return
         raw = {k: str(v.id if hasattr(v, "id") else v) for k, v in args.items() if v is not None}
         try:
             reply = await self.call(dispatch, self.invocation(interaction), name, raw)
         except UsageError as exc:
             reply = Reply(str(exc), ok=False)
+        await self.reply(interaction, reply)
+
+    async def yaml(self, interaction, args):
+        inv, seed, attachment = self.invocation(interaction), args["seed"], args["file"]
+        allowed = await self.call("yaml_permission", inv, seed)
+        if not allowed.ok:
+            await self.reply(interaction, allowed)
+            return
+        if (
+            attachment.size > self.cfg.archipelago.max_yaml_bytes
+            or not attachment.filename.lower().endswith((".yaml", ".yml"))
+        ):
+            reply = Reply("Use a .yaml or .yml file within the configured size cap.", ok=False)
+        else:
+            try:
+                content = await attachment.read()
+                reply = await self.call("submit_yaml", inv, seed, content)
+            except discord.HTTPException:
+                reply = Reply("Unable to read the Discord attachment. Please try again.", ok=False)
         await self.reply(interaction, reply)
 
     async def button(self, interaction, custom_id):
@@ -107,7 +133,7 @@ def register_commands(tree, adapter, guild):
         async def callback(interaction, _command=command, **kwargs):
             await adapter.command(interaction, _command.name, kwargs)
 
-        types = {STR: str, BOOL: bool, INT: int, USER: discord.User}
+        types = {STR: str, BOOL: bool, INT: int, USER: discord.User, ATTACHMENT: discord.Attachment}
         params = [
             inspect.Parameter(
                 "interaction",
@@ -207,6 +233,16 @@ class DiscordTransport:
 
         return self.wait(post(), False)
 
+    def post_seed(self, channel_id, message):
+        async def post():
+            channel = await self.client.fetch_channel(channel_id)
+            if channel.guild.id != self.cfg.community.guild_id:
+                raise ValueError("Seed channel must belong to the configured guild")
+            await channel.send(**message_kwargs(message))
+            return True
+
+        return self.wait(post(), False)
+
 
 class DiscordClient(discord.Client):
     def __init__(self, cfg):
@@ -256,7 +292,7 @@ class DiscordClient(discord.Client):
             self.timer.cancel()
             await asyncio.gather(self.timer, return_exceptions=True)
         if self.bot:
-            await asyncio.get_running_loop().run_in_executor(self.worker, self.bot.store.close)
+            await asyncio.get_running_loop().run_in_executor(self.worker, self.bot.close)
         self.worker.shutdown(wait=True)
         await super().close()
 

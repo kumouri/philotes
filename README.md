@@ -10,7 +10,8 @@ together, or keeps you apart. You don't get a friends list or profiles to browse
 swiping.
 
 **Status: Phase 1 under way.** Phase 0's simulator met its exit criteria. The Phase 1 Discord
-bot has a local core and Discord adapter; it has not been connected to Discord or used by anyone yet.
+bot has a local core, Discord adapter and optional Archipelago automation; it has not been
+connected to Discord or used by anyone yet.
 
 - [`docs/spec.md`](docs/spec.md) is the canonical spec. It covers the rulings, prior art, model and
   matcher, the density problem, trust & safety, privacy, phases and open questions.

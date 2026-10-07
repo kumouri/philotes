@@ -44,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"community: {cfg.community}")
         print(f"window: {cfg.window}")
         print(f"safety: {cfg.safety}")
+        print(f"archipelago: {cfg.archipelago}")
         print(f"database: {cfg.db_path}")
         print(f"DISCORD_TOKEN: {'set' if cfg.discord_token else 'absent'}")
         print("transports: local in-memory; Discord gateway via run")

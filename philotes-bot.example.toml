@@ -30,3 +30,26 @@ soft_half_life_days = 7.0     # avoid decay (§14 #9)
 recently_played_days = 14     # how long after a seed you can still mark someone
 min_account_age_days = 30     # Discord accounts younger than this can't join; 0 = off
 coplay_retention_days = 365
+
+[archipelago]
+# Ceryce installs AP herself; nothing is downloaded or run until enabled.
+enabled = false
+version = "0.6.8"
+install_path = ""
+games_manifest = ""             # offline export from that install; see SETUP
+data_path = "philotes-seeds"    # private storage, backed up with the database
+generator_command = ["ArchipelagoGenerate.exe"]
+server_command = ["ArchipelagoServer.exe"]
+submission_hours = 48
+reminder_hours = 24
+max_yaml_bytes = 65536
+generation_timeout_seconds = 600
+max_artifact_bytes = 104857600
+hosting_mode = "self_host"      # or "upload"; requires upload_enabled as well
+upload_enabled = false         # Ceryce's call; UNTESTED against the live site
+public_host = "localhost"      # host/domain players connect to
+bind_host = "127.0.0.1"         # change to 0.0.0.0 for remote players
+port_start = 38281              # one distinct port per active seed
+port_end = 38300
+restart_seconds = 60
+max_restarts = 3
