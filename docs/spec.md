@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Phase 0 exit criteria met** under the ruled async shape (batch at window close, 7-day soft-avoid half-life, A8 at the honest limit; §12, §14 #15). Simulator in [`src/philotes_sim/`](../src/philotes_sim/), results in [`phase0-results.md`](phase0-results.md). **Phase 1 is unblocked** (the patent check, §14 #14, is ruled). Nothing user-facing, no users or hosting yet. |
+| **Status** | **Phase 0 exit criteria met** under the ruled async shape (batch at window close, 7-day soft-avoid half-life, A8 at the honest limit; §12, §14 #15). Simulator in [`src/philotes_sim/`](../src/philotes_sim/), results in [`phase0-results.md`](phase0-results.md). **Phase 1 is unblocked** (the patent check, §14 #14, is ruled). Its bot core is built and runs locally ([`phase1-bot.md`](phase1-bot.md)); it is not connected to Discord, and there are no users or hosting yet. |
 | **Spec version** | v0.1, 2026-09-24 (first draft) |
 | **Owner / decider** | Ceryce |
 | **Canonical source** | This file. Other formats are rendered from it. |
