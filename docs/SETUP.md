@@ -26,8 +26,8 @@ sent appears in the output: DMs, seed channels and moderator posts.
 
 ## 2. On a Discord server (the host's steps)
 
-The code that connects to Discord is slice 2 ([phase1-bot.md](phase1-bot.md#slices-still-to-come)).
-These steps can be done before then. `philotes-bot check` confirms them.
+The Discord adapter is available. The host performs the steps below, starting on a private test
+server. `philotes-bot check` confirms local configuration without connecting.
 
 ### Before anything technical
 
@@ -55,6 +55,7 @@ These steps can be done before then. `philotes-bot check` confirms them.
    bot permissions:
    - **View Channels** and **Send Messages**, to post in seed channels and the moderators' channel;
    - **Manage Channels**, to create and delete private seed channels;
+   - **Read Message History** and **Attach Files**, for private replies and larger data exports;
    - **Manage Roles**, which Discord requires before a bot can set per-member permissions on the
      channels it creates.
 7. Open the generated URL and add the bot to a **private test server first**. Add it to the host
@@ -66,7 +67,7 @@ These steps can be done before then. `philotes-bot check` confirms them.
    - a **category** for seed channels (for example "Philotes seeds"), with the bot allowed to
      manage channels in it;
    - a **private moderators' channel** that only the moderators and the bot can see;
-   - or choose an existing **moderator role** whose holders may use `/mod` commands.
+   - choose an existing **moderator role** whose holders may use `/mod` commands.
 9. Turn on **Developer Mode** (User Settings → Advanced). Right-click the server, the role, the
    channel and the category, and **Copy ID** for each.
 
@@ -85,3 +86,27 @@ These steps can be done before then. `philotes-bot check` confirms them.
 13. Players who want the post-seed card by DM need **Allow direct messages from server members**
     switched on for the host server (Discord's privacy settings). Anyone who leaves it off can use
     `/recent` instead.
+
+### Start on her Windows desktop and try the private server
+
+14. In PowerShell, from the repo directory, run `uv sync --locked`, then
+    `uv run philotes-bot run`. Keep this terminal and the desktop awake. Ctrl+C stops it.
+    The token is read only from the untracked `.env`, not from process environment variables.
+    A missing token prints a setup message and exits without connecting. The bot uses outbound
+    gateway connections; no public web endpoint or inbound firewall rule is needed.
+15. Use only the private test server's IDs initially. With at least three consenting adult test
+    members (accounts at least 30 days old), try `/help`, `/join adult:true`, `/signup goals:short
+    size:3 accept:3`, and `/status`. A holder of the configured moderator role can run
+    `/mod close-window` to form the seed; an ordinary member should be refused.
+16. Check that each member receives one hand-off DM, can see the seed channel, and an unrelated
+    member cannot see it. Discord administrators can always see private channels. Use `/recent`
+    to exercise more, neutral, avoid, block and report; submit the report form and check that only
+    the moderators see the post. Try `/mod reports` and `/mod resolve`. Restart the process and
+    try an old card button again. Test a member with DMs closed and use `/status`/`/recent` instead.
+17. For a quick card/cleanup trial, use a separate disposable test database and shorten
+    `[window] goal_days` in that test configuration, keeping one value per goal. Restore defaults
+    before the host community trial. Do not shorten retention in a community database.
+18. Use one bot process per database. Keep `.env` and the database private, and back up the database
+    while the bot is stopped. Review [hosting options](phase1-bot.md#hosting-options-for-ceryce-14-6-remains-her-decision)
+    before choosing an always-on host; §14 #6 remains Ceryce's decision. No application, invite,
+    token or hosted service was created during implementation.

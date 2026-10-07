@@ -6,14 +6,14 @@ moderation by the host community's mods. This document covers what is built so f
 made where the spec is silent, and the slices still to come. Setting it up on a real server is in
 [SETUP.md](SETUP.md). What players are told is in [user-guide.md](user-guide.md).
 
-## Slice 1 (this one): the core, runnable locally
+## Slice 1: the core, runnable locally
 
 Everything the bot decides, end to end, on a fake clock and an in-memory transport. It needs no
 token, makes no network calls, and nothing in it imports a Discord library.
 
 | Module (`src/philotes_bot/`) | What it holds |
 |---|---|
-| `config.py` | One TOML file per host community, plus `DISCORD_TOKEN` from the environment or an untracked `.env`. The matcher settings are the ruled v1 values. |
+| `config.py` | One TOML file per host community, plus `DISCORD_TOKEN` only from an untracked `.env`. The matcher settings are the ruled v1 values. |
 | `store.py` | SQLite tables for everything the bot keeps (§11), and the retention purge. |
 | `matching.py` | Loads the database into Phase 0's `EdgeStore` and runs `philotes_sim.rounds.batch_at_close`. |
 | `core.py` | `Bot`: one method per slash command, the card buttons, moderator commands, and `tick()` on a timer. |
@@ -89,11 +89,50 @@ The simplest option was taken each time. Each one can be revisited.
 - **Archipelago generation stays manual for now.** The seed channel asks members to share YAMLs and
   pick someone to generate and host, as groups do today (§9.2). Automating it is slice 3.
 
+## Slice 2: Discord connection
+
+`discord_adapter.py` translates the existing `commands.COMMANDS`, `Reply`, `Message` and
+`Transport` interface into guild slash commands, ephemeral replies, persistent card buttons,
+a report modal, DMs, private seed channels and moderator posts. `philotes-bot run` starts it.
+The core still owns matching, eligibility, moderation refusal, card timing and one hand-off DM
+per member. Only the nonprivileged guilds intent is enabled; individual members needed for
+channel overwrites are fetched by ID, never enumerated.
+
+Choices where the spec is silent:
+
+- discord.py 2.7 is the established, widely used, maintained Python Discord library, supports
+  Python 3.13 and provides application commands, dynamic persistent buttons and modals directly.
+- One dedicated worker owns SQLite and serializes every core call, including the one-minute
+  timer. A synchronous transport bridges to the gateway event loop and waits for delivery results.
+- Slash commands are registered only in the configured guild. Moderator authority comes from
+  the configured role on the interaction, with no administrator bypass. Replies are ephemeral;
+  mentions never ping. Text over Discord's 2,000-character limit becomes a private text attachment.
+- Dynamic button IDs survive process restarts without storing Discord message IDs. The core
+  validates the actor's co-play history on every press. Report modals collect at most 1,500 characters.
+- Tokens are read only from `.env` (or the explicitly selected env file); process environment
+  tokens are ignored. Missing tokens or community IDs stop `run` before any connection.
+- Discord HTTP delivery failures return the existing transport failure values and log a generic
+  warning. There is no retry queue: failed hand-off DMs are not resent; players use `/status` and
+  `/recent`. Existing core delivery/persistence crash windows remain; run one process per database.
+
+### Hosting options for Ceryce (§14 #6 remains her decision)
+
+Recommendation first; prices checked 2026-10-07, before tax, backups and extra usage.
+These host the gateway bot, not an Archipelago room.
+
+| Option | Cost | Tradeoff |
+|---|---|---|
+| **Recommended: small DigitalOcean VPS** | [From US$4/month](https://www.digitalocean.com/products/droplets); budget US$6/month for 1 GiB | Always-on gateway and local SQLite fit directly; Ceryce maintains OS, service and backups; measure memory before choosing the smallest size. |
+| **Her existing Windows desktop** | US$0 hosting fee, plus electricity | Works now with `uv run philotes-bot run`; sleep, reboots and internet outages pause matching. |
+| **Railway Hobby with persistent volume** | [US$5/month minimum including US$5 usage](https://docs.railway.com/pricing/plans), overage extra | Less OS maintenance; SQLite needs a mounted volume and one replica, and usage can exceed the minimum. |
+
+No provider has been selected or provisioned. Ceryce tries this on a private test server first;
+[SETUP.md](SETUP.md) contains her steps. Offline tests cover adapter events without logging in.
+
 ## Slices still to come
 
 | Slice | What it contains |
 |---|---|
-| **2. Discord gateway** | A `Transport` on discord.py: register `commands.COMMANDS` as guild slash commands; card buttons as persistent views; a modal for a report's reason; DMs; private seed channels under the configured category with per-member overwrites; the moderator-role check; `philotes-bot run` with a one-minute `tick()`. Hosting decided then (§14 #6: one small always-on VPS is the simplest fit for a gateway bot with SQLite). Verified by Ceryce on a private test server before the host community sees it. |
 | **3. Archipelago hand-off** | Collect each member's YAML (and game) after the seed forms, validate it, generate the multiworld, host or upload the room, and post the room link to the seed channel. This depends on the §9.2 caveats: Archipelago's licence and generation API, and hosting costs for long-running async rooms. Also: members can end a seed early or extend it. |
 | **4. Trust & safety review tooling** | Coordinated hard-blocking detection (§8: several accounts that often share seeds blocking the same target within a short window) sent to moderators for review. Per-target report history for moderators, still showing only counts of avoids. Handling for abusive reporting. |
 | **5. Alpha measurement** | Privacy-preserving aggregates for the Phase 1 success test (repeat use, reunions, graduation) and the async criteria A1, A3–A8 on real data, so the Phase 0 assumptions can be checked. Also the banter-tolerance axis trial (§14 #16). |

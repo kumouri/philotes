@@ -10,7 +10,7 @@ together, or keeps you apart. You don't get a friends list or profiles to browse
 swiping.
 
 **Status: Phase 1 under way.** Phase 0's simulator met its exit criteria. The Phase 1 Discord
-bot's core runs locally, but it isn't connected to Discord or used by anyone yet.
+bot has a local core and Discord adapter; it has not been connected to Discord or used by anyone yet.
 
 - [`docs/spec.md`](docs/spec.md) is the canonical spec. It covers the rulings, prior art, model and
   matcher, the density problem, trust & safety, privacy, phases and open questions.
@@ -76,13 +76,14 @@ git-ignored.
 `src/philotes_bot/` is the Discord bot for the closed alpha (spec §12 Phase 1): weekly sign-ups for
 async Archipelago seeds, seeds formed in one batch at window close by the simulator's own matcher,
 the post-seed card, reports to the host community's moderators, and the §11 data rights. This
-slice is the core. It runs locally on an in-memory transport, with no token and no network.
+bot also runs locally on an in-memory transport, with no token and no network.
 [`docs/phase1-bot.md`](docs/phase1-bot.md) has the module map and the remaining slices.
 
 ```sh
 uv run philotes-bot demo       # a scripted two-week run, printed
 uv run philotes-bot console    # type commands as any user; move the clock with `advance 7d`
 uv run philotes-bot check      # resolved config; says whether DISCORD_TOKEN is set, never its value
+uv run philotes-bot run        # host only: connect after following docs/SETUP.md
 ```
 
 Configuration is `philotes-bot.toml` (copy `philotes-bot.example.toml`). The token goes in an
