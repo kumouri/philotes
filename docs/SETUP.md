@@ -110,3 +110,90 @@ server. `philotes-bot check` confirms local configuration without connecting.
     while the bot is stopped. Review [hosting options](phase1-bot.md#hosting-options-for-ceryce-14-6-remains-her-decision)
     before choosing an always-on host; §14 #6 remains Ceryce's decision. No application, invite,
     token or hosted service was created during implementation.
+
+## 3. Archipelago automation (Ceryce's installation and configuration)
+
+This slice targets **Archipelago 0.6.8**, checked against
+[its release source](https://github.com/ArchipelagoMW/Archipelago/tree/0.6.8).
+It ships with `[archipelago] enabled = false` and `upload_enabled = false`. Nothing installs
+Archipelago for you. The automated tests use small fake generator/server scripts; they do not
+prove a real game can generate or that a room is reachable. Start with consenting players on the
+private Discord test server only after the host setup is complete.
+
+1. Install Archipelago 0.6.8 yourself on the machine that runs Philotes, following
+   [the upstream setup instructions](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.8/docs/running%20from%20source.md).
+   Keep its runtime/dependencies separate from Philotes' Python 3.13 environment. Prepare any
+   required game files/ROMs privately and configure AP's `host.yaml` for unattended generation
+   (including race mode off so a spoiler is produced). Use only trusted bundled worlds; the bot
+   accepts data files, never players' `.apworld` plugins. Review the upstream licence and individual
+   worlds' requirements before hosting. No AP packages or game files are committed here.
+2. Export the games from that exact trusted install **offline**, using its Python runtime.
+   In PowerShell, from the Archipelago source directory, run (use the install's Python path):
+
+   ```powershell
+   .\venv\Scripts\python.exe -c 'import json, pathlib, Utils; from worlds import AutoWorldRegister; pathlib.Path("philotes-games.json").write_text(json.dumps({"version": Utils.__version__, "games": sorted(AutoWorldRegister.world_types)}), encoding="utf-8")'
+   ```
+
+   This imports the operator-installed trusted worlds, not any player YAML. Keep the resulting
+   manifest private and regenerate it if the install changes. The bot reads this JSON without
+   importing AP. A packaged install needs a matching manifest exported from the same release's
+   source/runtime with the same installed worlds; do not copy a current online games list.
+3. Set `[archipelago]` in the untracked `philotes-bot.toml`. For a source install, an example is:
+
+   ```toml
+   [archipelago]
+   enabled = true
+   version = "0.6.8"
+   install_path = 'C:\Archipelago'
+   games_manifest = 'C:\Archipelago\philotes-games.json'
+   data_path = 'C:\PhilotesPrivate\seeds'
+   generator_command = ['C:\Archipelago\venv\Scripts\python.exe', 'C:\Archipelago\Generate.py']
+   server_command = ['C:\Archipelago\venv\Scripts\python.exe', 'C:\Archipelago\MultiServer.py']
+   hosting_mode = "self_host"
+   upload_enabled = false
+   public_host = "your-hostname.example"
+   bind_host = "0.0.0.0"
+   port_start = 38281
+   port_end = 38300
+   ```
+
+   Relative command executables resolve inside `install_path`; use absolute paths for interpreters
+   and script arguments. The example file lists every setting, including 48/24-hour deadline and
+   reminder, 64 KiB YAML cap, 600-second generation timeout, 100 MiB artifact cap, restart backoff
+   and restart limit. Protect `data_path` and the database with host-only filesystem permissions:
+   they include submitted YAMLs, player names, spoilers, saves, logs and room passwords. Do not
+   put them in shared folders or commit them. Default `philotes-seeds/` is git-ignored.
+4. For remote players, allow inbound TCP for the configured port range on the room host and, if
+   needed, forward it on the router. The bot gateway alone needed no inbound rules; a MultiServer
+   room does. `localhost`/`127.0.0.1` defaults are for local testing only. Configure a real public
+   hostname/address, capacity and availability before offering long async seeds. Each active seed
+   occupies one port; no available port or failed binding becomes a visible hosting failure.
+5. Run `uv run philotes-bot check` locally, then start the bot yourself on the private test server.
+   Form a seed and submit `/yaml seed:1 file:<your YAML attachment>` as each member. Try invalid
+   files and duplicate names. Check all-in generation, the archive attachment (it includes spoilers),
+   moderator summaries, connection password and an actual client connection. Stop/restart the bot
+   and verify AP saves resume. Check a shorter disposable deadline with a missing submitter; do not
+   shorten production retention. Detailed game options are finally validated by AP's generator.
+6. One process per database. Ctrl+C shuts down owned AP processes; run under your chosen service
+   manager for an always-on host. If you forcibly kill the bot, inspect and stop orphan AP processes
+   before starting it again. Interrupted generation becomes failed; inspect the seed's private
+   `generator.log`, fix installation/configuration, and form a new seed rather than editing SQLite
+   state to replay the job. A server crash is restarted up to three times with the same port,
+   password and save path, then reported failed. At seed end the room stops. Fourteen days later,
+   its files, YAML rows, credentials and job state are purged with the channel. `/leave` after
+   generation stops and deletes the whole local room and its channel to erase combined player
+   data, including the bot's posted archive/credentials. Back up the
+   database and files privately while the bot is stopped, and apply retention to backups too.
+
+### Upload to archipelago.gg — disabled, Ceryce's decision
+
+The upload path exists but is **off by default and untested against the live site**. Selecting
+`hosting_mode = "upload"` without `upload_enabled = true` is rejected. Neither a live upload nor
+any contact with archipelago.gg was performed during implementation. Do not enable it as part of
+routine setup; Ceryce decides whether sharing player data with a third-party service is acceptable.
+
+Opting in uploads the generated archive including spoiler, creates a room via the site's web UI,
+and posts its room-page link. The upstream 0.6.8 UI contract can change. Site ownership cookies
+are not persisted, remote end/deletion is not automated, and site retention applies independently
+of local cleanup or `/leave`. Confirm an acceptable owner/recovery/deletion procedure and tell
+players about this limitation before opting in. Self-host supervision applies only to local rooms.

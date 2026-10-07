@@ -82,6 +82,22 @@ CREATE TABLE IF NOT EXISTS reports (
     status TEXT NOT NULL DEFAULT 'open',   -- open | resolved
     resolution TEXT
 );
+CREATE TABLE IF NOT EXISTS ap_jobs (
+    seed_id INTEGER PRIMARY KEY REFERENCES seeds(id) ON DELETE CASCADE,
+    deadline REAL NOT NULL,
+    reminded INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'collecting',
+    port INTEGER,
+    password TEXT,
+    restarts INTEGER NOT NULL DEFAULT 0,
+    retry_at REAL NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS ap_yamls (
+    seed_id INTEGER NOT NULL REFERENCES ap_jobs(seed_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL,
+    content BLOB NOT NULL,
+    PRIMARY KEY (seed_id, user_id)
+);
 """
 
 DAY = 86400.0
@@ -214,6 +230,7 @@ class Store:
             "DELETE FROM seed_members WHERE user_id = ?",
             "DELETE FROM edges WHERE author = ?1 OR target = ?1",
             "DELETE FROM coplay WHERE a = ?1 OR b = ?1",
+            "DELETE FROM ap_yamls WHERE user_id = ?",
         ):
             self.db.execute(sql, (user_id,))
         self.db.commit()

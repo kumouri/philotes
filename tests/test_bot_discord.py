@@ -10,6 +10,7 @@ from philotes_bot.cli import main
 from philotes_bot.commands import COMMANDS
 from philotes_bot.discord_adapter import Adapter, CardButton, DiscordClient, message_kwargs
 from philotes_bot.transport import Message
+from tests.test_bot_archipelago import player_yaml
 from tests.test_bot_core import join_and_sign, to_close, world
 
 
@@ -57,6 +58,38 @@ def test_commands_buttons_and_modal(loop):
         assert len(w.store.reports()) == 1 and len(w.t.mod_posts) == 1
         assert w.store.edge(1, 2).via_report
         w.store.close()
+
+    loop.run_until_complete(scenario())
+
+
+def test_yaml_attachment_reads_only_for_authorized_member(loop, automated):
+    async def scenario():
+        w = automated()
+
+        async def call(method, *args):
+            return getattr(w.bot, method)(*args)
+
+        adapter = Adapter(w.bot.cfg, call)
+        attachment = SimpleNamespace(
+            filename="../../player.yaml", size=40, read=AsyncMock(return_value=player_yaml())
+        )
+        for actor in (interaction(user=999), interaction(guild=78)):
+            await adapter.command(actor, "yaml", {"seed": 1, "file": attachment})
+            assert "ephemeral" in actor.followup.send.call_args.kwargs
+        attachment.read.assert_not_called()
+        for filename, size in [("player.exe", 40), ("player.yaml", 65537)]:
+            attachment.filename, attachment.size = filename, size
+            await adapter.command(interaction(), "yaml", {"seed": 1, "file": attachment})
+        attachment.read.assert_not_called()
+        attachment.filename, attachment.size = "player.yaml", 40
+        i = interaction()
+        await adapter.command(i, "yaml", {"seed": 1, "file": attachment})
+        assert "accepted" in i.followup.send.call_args.kwargs["content"]
+        attachment.read.assert_awaited_once()
+        attachment.read.return_value = b"invalid"
+        i = interaction()
+        await adapter.command(i, "yaml", {"seed": 1, "file": attachment})
+        assert "mapping" in i.followup.send.call_args.kwargs["content"]
 
     loop.run_until_complete(scenario())
 

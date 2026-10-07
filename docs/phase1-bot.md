@@ -18,7 +18,7 @@ token, makes no network calls, and nothing in it imports a Discord library.
 | `matching.py` | Loads the database into Phase 0's `EdgeStore` and runs `philotes_sim.rounds.batch_at_close`. |
 | `core.py` | `Bot`: one method per slash command, the card buttons, moderator commands, and `tick()` on a timer. |
 | `commands.py` | The slash-command list, declared once. The console uses it now, and the Discord adapter will register the same list. |
-| `transport.py` | The four side effects the core needs (DM, create and delete a seed channel, post to mods), and `InMemoryTransport`. |
+| `transport.py` | Core side effects (DM, create/delete a seed channel, seed posts/files, moderator posts), and `InMemoryTransport`. |
 | `console.py`, `cli.py` | `philotes-bot demo`, `philotes-bot console`, `philotes-bot check`. |
 | `text.py` | Wording the spec constrains, including the "avoids are honoured" statement. |
 
@@ -85,9 +85,9 @@ The simplest option was taken each time. Each one can be revisited.
   marks and never anyone's marks about you. `/leave confirm:true` deletes your profile, sign-ups,
   seat records and co-play records, and every edge in both directions. Reports stay, per moderation
   policy (§11).
-- **Storage is SQLite** from the standard library. No new dependencies.
-- **Archipelago generation stays manual for now.** The seed channel asks members to share YAMLs and
-  pick someone to generate and host, as groups do today (§9.2). Automating it is slice 3.
+- **Storage is SQLite** from the standard library. Slice 3 adds PyYAML for safe player-file parsing.
+- **Archipelago generation is configurable.** With automation disabled, the original manual
+  hand-off remains available. Slice 3 below describes the automated path.
 
 ## Slice 2: Discord connection
 
@@ -129,10 +129,96 @@ These host the gateway bot, not an Archipelago room.
 No provider has been selected or provisioned. Ceryce tries this on a private test server first;
 [SETUP.md](SETUP.md) contains her steps. Offline tests cover adapter events without logging in.
 
+## Slice 3: Archipelago automation
+
+`archipelago.py` collects and safely validates player YAMLs, invokes Archipelago's generator,
+captures its archive and spoiler, and supervises a room process. `Bot.tick()` drives deadlines,
+reminders, subprocess completion, timeouts, restarts and cleanup on the existing one-minute timer.
+No Archipelago install is bundled, imported into the bot, downloaded or installed automatically.
+The target is **Archipelago 0.6.8**. Interfaces were checked against its tagged source:
+[Generate.py](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.8/Generate.py),
+[Main.py](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.8/Main.py),
+[MultiServer.py](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.8/MultiServer.py),
+[upload.py](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.8/WebHostLib/upload.py) and
+[misc.py](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.8/WebHostLib/misc.py).
+The local automated tests use fake Python executables, with no real Archipelago install or network.
+
+Choices where the spec is silent:
+
+- **Submission is `/yaml seed:<number> file:<Discord attachment>`.** This uses players' existing
+  files without transcription into a modal, needs no message-content intent and gives a private
+  acceptance/rejection reply. The guild, opted-in player and seed membership are checked before
+  reading an attachment, then again before saving. Original filenames never become paths.
+  One YAML per member; replacements are allowed while collection is open. `/status` shows the
+  member's submission state and `/mydata` includes only their own normalized YAMLs.
+- **48-hour deadline, one reminder at 24 hours**, both configurable and capped by the seed's end.
+  Reminder and operational messages go only to the private seed channel, without pings or new
+  DMs (§13). All members submitted: start early. At the deadline: use only submitted members,
+  even one. Zero submissions: mark failed and notify the channel and moderators. Late files are
+  refused, and the same job is never automatically generated twice. Missing submitters keep their
+  original seed-channel/card seats; this slice does not change the matcher's co-play semantics.
+  Goal duration still runs from formation, as in slice 1, rather than restarting after generation.
+- **Validation is deliberately narrow.** Default 64 KiB, one UTF-8 document, safe loading only,
+  mapping root, literal nonempty `name` (at most 16 characters, unique ignoring case, no name
+  placeholders/whitespace padding/reserved `Archipelago`), literal `game` and a game-options
+  mapping are required. An offline supported-games manifest exported from the configured install
+  must match the configured version; unknown games fail before acceptance. Quantity must be one.
+  Aliases/anchors, non-plain values, excessive nesting, linked options and triggers are refused;
+  triggers could replace the fields just validated. Game-specific option correctness and required
+  ROMs are Archipelago's responsibility at generation. Safe normalized data is staged in numeric
+  per-seed/member paths; no player code, shell commands, imports or executable files are run.
+- **Archipelago owns generation.** Operator-configured argument arrays run without a shell in the
+  configured install directory, with isolated input/output paths, explicit slot count, spoiler
+  level 1, plando disabled and no default weights or meta file. Each seed has one generation
+  attempt; default timeout is 600 wall-clock seconds, detected on the next timer tick (up to a
+  minute later). Output/errors go to a private host log; player content and raw errors are not
+  echoed to moderators. Success requires one archive and one multidata/spoiler inside it, within
+  configured size limits. Extraction uses fixed target filenames, never archive paths. The
+  archive is attached to the seed channel (including its spoiler); a separate spoiler stays on
+  the host. Moderators receive success/failure summaries, without passwords or player files.
+- **Self-host is the selected mode**, but all automation ships disabled. A distinct free port
+  from the configured range is assigned to each seed, with a generated random password stored
+  privately in SQLite. The configured MultiServer command receives multidata, bind address,
+  port, password and a per-seed save path. Only the seed channel gets connection credentials.
+  A process-start notice does not guarantee internet reachability: Ceryce must test the install,
+  firewall and address herself. Process exits schedule a restart on the timer, default 60-second
+  backoff and three restarts total; exhaustion fails visibly. Port/password/save path are reused.
+- **Shutdown stops owned children; ended seeds stop rooms.** Graceful bot restart resumes active
+  self-hosted rooms from retained artifacts and save paths; interrupted generation is reported
+  failed rather than silently rerun. Use one bot per database. After a forced bot kill or machine
+  crash, the host must check for orphan AP processes before restarting; this slice does not add
+  an OS service manager. AP saves on its own schedule, so abrupt termination can lose progress
+  since its last save. Failures need host intervention; no automatic regeneration or retry command.
+- **Files and submissions expire with the seed channel**, default 14 days after the seed ends,
+  shorter than the 365-day co-play history. Inputs, archive, spoiler, saves, logs, password and
+  job state are deleted together. `/leave` deletes an ungenerated YAML immediately. If a YAML
+  was already combined into generated data, the whole local room stops and its files are erased,
+  since redacting an AP archive/save safely is unavailable. Its channel is deleted too, to remove
+  the bot's posted archive and credentials; this consequence appears in `/leave` confirmation.
+  Copies already downloaded by players
+  cannot be recalled. The filesystem directory and database must be backed up privately together.
+  If co-play retention is configured shorter than channel retention, files are removed before
+  that shorter history purge so a deleted seed cannot leave orphan files behind.
+- **Upload ships disabled and has never been tested against the live site.** It requires both
+  `hosting_mode = "upload"` and `upload_enabled = true`; Ceryce decides whether to opt in.
+  The code uses a cookie session, multipart archive upload to `/uploads`, then `/new_room/<seed>`,
+  and posts the returned room page. This is the 0.6.8 web UI contract, not a promised stable API.
+  Fake responses test the request shape; no live request was made.
+  Interrupted uploads fail visibly on restart and are never automatically repeated, since the
+  remote operation might already have succeeded. Upload sends the whole archive,
+  including player names/game data and spoiler, to archipelago.gg. Its retention and room lifecycle
+  belong to the site; local end/deletion does not stop or erase a remote room. Site owner cookies
+  are not persisted, and automated remote management/deletion is outside this slice. Discuss that
+  limitation with players before enabling it.
+
+Early ending/extending by members remains future work; this slice uses the existing goal-duration
+end. No Discord connection, Archipelago download/install, real generator/server or third-party
+upload was performed during development. The GitHub PR/CI are the only publishing operations.
+
 ## Slices still to come
 
 | Slice | What it contains |
 |---|---|
-| **3. Archipelago hand-off** | Collect each member's YAML (and game) after the seed forms, validate it, generate the multiworld, host or upload the room, and post the room link to the seed channel. This depends on the §9.2 caveats: Archipelago's licence and generation API, and hosting costs for long-running async rooms. Also: members can end a seed early or extend it. |
+| **Seed lifecycle follow-up** | Members can end a seed early or extend it; real-install/private-server acceptance testing and host provisioning remain Ceryce's steps. |
 | **4. Trust & safety review tooling** | Coordinated hard-blocking detection (§8: several accounts that often share seeds blocking the same target within a short window) sent to moderators for review. Per-target report history for moderators, still showing only counts of avoids. Handling for abusive reporting. |
 | **5. Alpha measurement** | Privacy-preserving aggregates for the Phase 1 success test (repeat use, reunions, graduation) and the async criteria A1, A3–A8 on real data, so the Phase 0 assumptions can be checked. Also the banter-tolerance axis trial (§14 #16). |

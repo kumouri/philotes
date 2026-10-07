@@ -9,3 +9,4 @@ __pycache__/
 .env
 philotes-bot.toml
 *.db
+/philotes-seeds/

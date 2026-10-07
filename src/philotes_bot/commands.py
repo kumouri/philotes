@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from .core import Bot, Invocation, Reply
 
 STR, INT, BOOL, USER = "str", "int", "bool", "user"
+ATTACHMENT = "attachment"
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,15 @@ COMMANDS: tuple[Command, ...] = (
     ),
     Command("withdraw", "withdraw", "Take back this week's sign-up"),
     Command("status", "status", "Your sign-up and your seeds"),
+    Command(
+        "yaml",
+        "submit_yaml",
+        "Submit or replace your Archipelago player YAML",
+        (
+            Option("seed", INT, "Seed number", True),
+            Option("file", ATTACHMENT, "Your .yaml or .yml file (max 64 KiB by default)", True),
+        ),
+    ),
     Command("recent", "recent", "People you've played with lately, to mark"),
     Command(
         "forget",
@@ -123,6 +133,10 @@ class UsageError(ValueError):
 
 
 def convert(opt: Option, raw: str) -> object:
+    if opt.kind == ATTACHMENT:
+        raise UsageError(
+            "Submit /yaml with a Discord file attachment; console does not read files."
+        )
     if opt.kind == STR:
         if opt.choices and raw not in opt.choices:
             raise UsageError(f"{opt.name} must be one of: {', '.join(opt.choices)}")
