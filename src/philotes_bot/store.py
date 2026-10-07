@@ -2,7 +2,8 @@
 
 Everything the bot keeps is in these tables, and nothing else is kept (§11): Discord user IDs, the
 style and interests a player set, sign-ups, seeds and who was in them, outgoing edges, co-play
-records, reports and moderator removals. No message content, presence or names.
+records, reports, moderator removals and retention-limited alpha summaries.
+No message content, presence or names.
 
 Times are UTC epoch seconds. User IDs are Discord snowflakes (integers).
 """
@@ -17,6 +18,26 @@ from itertools import combinations
 from philotes_sim.edges import HARD, MORE, SOFT, soft_avoid_weight
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS alpha_rates (
+    user_id INTEGER NOT NULL, week REAL NOT NULL, entries INTEGER NOT NULL,
+    placed INTEGER NOT NULL, PRIMARY KEY(user_id, week)
+);
+CREATE TABLE IF NOT EXISTS alpha_newcomers (
+    user_id INTEGER PRIMARY KEY, joined_at REAL NOT NULL,
+    first_mutual_at REAL, first_mutual_session INTEGER
+);
+CREATE TABLE IF NOT EXISTS alpha_pending_pairs (
+    window_id INTEGER NOT NULL, a INTEGER NOT NULL, b INTEGER NOT NULL,
+    mutual INTEGER NOT NULL, PRIMARY KEY(window_id, a, b)
+);
+CREATE TABLE IF NOT EXISTS alpha_reunions (
+    window_id INTEGER PRIMARY KEY, closed_at REAL NOT NULL,
+    tries INTEGER NOT NULL, hits INTEGER NOT NULL, unknown INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS alpha_graduations (
+    user_id INTEGER PRIMARY KEY, t REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alpha_windows (
     window_id INTEGER PRIMARY KEY,
     closed_at REAL NOT NULL,
@@ -205,7 +226,12 @@ class Store:
         return PlayerRow(r[0], r[1], (r[2], r[3], r[4]), tuple(json.loads(r[5])), r[6], r[7], r[8])
 
     def add_player(self, user_id: int, now: float) -> None:
+        new = self.player(user_id) is None
         self._exec("INSERT OR IGNORE INTO players (user_id, joined_at) VALUES (?, ?)", user_id, now)
+        if new:
+            self._exec(
+                "INSERT INTO alpha_newcomers (user_id, joined_at) VALUES (?, ?)", user_id, now
+            )
 
     def set_style(self, user_id: int, style: tuple[int, int, int]) -> None:
         self._exec(
@@ -240,6 +266,10 @@ class Store:
         Reports are kept, per moderation policy (§11).
         """
         for sql in (
+            "DELETE FROM alpha_rates WHERE user_id = ?",
+            "DELETE FROM alpha_newcomers WHERE user_id = ?",
+            "DELETE FROM alpha_graduations WHERE user_id = ?",
+            "DELETE FROM alpha_pending_pairs WHERE a = ?1 OR b = ?1",
             "DELETE FROM players WHERE user_id = ?",
             "DELETE FROM signups WHERE user_id = ?",
             "DELETE FROM seed_members WHERE user_id = ?",
@@ -269,6 +299,7 @@ class Store:
         self._exec("UPDATE windows SET closed = 1 WHERE id = ?", window_id)
 
     def upsert_signup(self, s: SignupRow) -> None:
+        existing = self.signup(s.window_id, s.user_id) is not None
         self._exec(
             "INSERT OR REPLACE INTO signups VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             s.window_id,
@@ -278,6 +309,22 @@ class Store:
             *s.acc,
             s.signed_at,
         )
+
+        if existing:
+            return  # Edits keep the original signup time; missing legacy state stays unknown.
+        for other in self.signups(s.window_id):
+            if other.user_id == s.user_id:
+                continue
+            a, b = sorted((s.user_id, other.user_id))
+            ea, eb = self.edge(a, b), self.edge(b, a)
+            mutual = bool(ea and eb and ea.kind == eb.kind == MORE)
+            self._exec(
+                "INSERT OR IGNORE INTO alpha_pending_pairs VALUES (?, ?, ?, ?)",
+                s.window_id,
+                a,
+                b,
+                int(mutual),
+            )
 
     def signup(self, window_id: int, user_id: int) -> SignupRow | None:
         rows = [s for s in self.signups(window_id) if s.user_id == user_id]
@@ -292,6 +339,12 @@ class Store:
         ]
 
     def delete_signup(self, window_id: int, user_id: int) -> bool:
+        self._exec(
+            "DELETE FROM alpha_pending_pairs WHERE window_id = ? AND (a = ? OR b = ?)",
+            window_id,
+            user_id,
+            user_id,
+        )
         cur = self._exec(
             "DELETE FROM signups WHERE window_id = ? AND user_id = ?", window_id, user_id
         )
@@ -302,10 +355,20 @@ class Store:
             "UPDATE signups SET window_id = ? WHERE window_id = ? AND user_id = ?",
             [(to_window, from_window, u) for u in user_ids],
         )
+        for _, a, b, mutual in self._all(
+            "SELECT * FROM alpha_pending_pairs WHERE window_id = ?", from_window
+        ):
+            if a in user_ids and b in user_ids:
+                self.db.execute(
+                    "INSERT OR IGNORE INTO alpha_pending_pairs VALUES (?, ?, ?, ?)",
+                    (to_window, a, b, mutual),
+                )
+        self.db.execute("DELETE FROM alpha_pending_pairs WHERE window_id = ?", (from_window,))
         self.db.execute("DELETE FROM signups WHERE window_id = ?", (from_window,))
         self.db.commit()
 
     def delete_user_signups(self, user_id: int) -> None:
+        self._exec("DELETE FROM alpha_pending_pairs WHERE a = ?1 OR b = ?1", user_id)
         self._exec("DELETE FROM signups WHERE user_id = ?", user_id)
 
     # --- seeds and co-play -----------------------------------------------------------------
@@ -399,6 +462,31 @@ class Store:
             now,
             int(via_report),
         )
+
+        self.sample_first_mutual(now)
+
+    def sample_first_mutual(self, now: float) -> None:
+        """Record first mutual timing and completed-session count, without a partner ID."""
+        for (u,) in self._all("SELECT user_id FROM alpha_newcomers WHERE first_mutual_at IS NULL"):
+            if not any(
+                e.kind == MORE and (reverse := self.edge(e.target, u)) and reverse.kind == MORE
+                for e in self.edges_of(u)
+            ):
+                continue
+            n = self._one(
+                "SELECT COUNT(*) FROM seed_members m JOIN seeds s ON s.id = m.seed_id "
+                "WHERE m.user_id = ? AND s.ends_at <= ?",
+                u,
+                now,
+            )[0]
+            if self._one("SELECT 1 FROM seed_members WHERE user_id = ?", u):
+                self._exec(
+                    "UPDATE alpha_newcomers SET first_mutual_at = ?, "
+                    "first_mutual_session = ? WHERE user_id = ? AND first_mutual_at IS NULL",
+                    now,
+                    n,
+                    u,
+                )
 
     def clear_edge(self, author: int, target: int) -> bool:
         cur = self._exec("DELETE FROM edges WHERE author = ? AND target = ?", author, target)
@@ -501,6 +589,10 @@ class Store:
                     "DELETE FROM edges WHERE author = ? AND target = ?", (e.author, e.target)
                 )
         cutoff = now - coplay_days * DAY
+        self.db.execute("DELETE FROM alpha_rates WHERE week < ?", (cutoff,))
+        self.db.execute("DELETE FROM alpha_newcomers WHERE joined_at < ?", (cutoff,))
+        self.db.execute("DELETE FROM alpha_reunions WHERE closed_at < ?", (cutoff,))
+        self.db.execute("DELETE FROM alpha_graduations WHERE t < ?", (cutoff,))
         self.db.execute("DELETE FROM alpha_windows WHERE closed_at < ?", (cutoff,))
         self.db.execute("DELETE FROM coplay WHERE last_t < ?", (cutoff,))
         old = [r[0] for r in self._all("SELECT id FROM seeds WHERE ends_at < ?", cutoff)]

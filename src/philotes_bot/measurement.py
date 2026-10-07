@@ -1,4 +1,4 @@
-"""Local alpha reporting. Only anonymous window totals survive sign-up deletion."""
+"""Anonymous alpha reports from retention-limited summaries and private milestones."""
 
 from __future__ import annotations
 
@@ -12,20 +12,20 @@ from pathlib import Path
 
 from philotes_sim import experiments
 from philotes_sim.lockout import check_pool
-from philotes_sim.metric_helpers import placement_metrics
+from philotes_sim.metric_helpers import (
+    cosignup_metrics,
+    match_rate_metrics,
+    newcomer_metrics,
+    placement_metrics,
+)
 
 from .config import BotConfig
 from .matching import Entry, edge_snapshot
 from .store import DAY, SignupRow, Store
 
 UNMEASURABLE = {
-    "A5": "Closed sign-ups are deleted; per-player placement denominators are unavailable.",
-    "A6": "Marks are overwritten/forgotten; first mutual-more timing and newcomer cohorts "
-    "are unavailable.",
-    "A7": "Historical mutual-more state at co-signup is unavailable; current edges cannot "
-    "reconstruct the simulator's denominator.",
-    "A8": "First-session card labels (including neutral defaults) are not retained; "
-    "current avoids cannot substitute for those labels.",
+    "A8": "not measurable by design: first-card avoid labels would survive soft-avoid "
+    "deletion/forget, violating §11 retention and user control. Current edges are not labels.",
 }
 
 
@@ -72,6 +72,84 @@ def save_close(store: Store, wid: int, now: float, counts: dict) -> None:
     )
 
 
+def save_history(store, wid, now, signups, formed):
+    """Delete-window-compatible summaries; never retain closed individual sign-ups."""
+    if store._one("SELECT 1 FROM alpha_reunions WHERE window_id = ?", wid):
+        return
+    eligible = {
+        s.user_id: s for s in signups if (p := store.player(s.user_id)) and p.removed_at is None
+    }
+    seats = {u: i for i, (_, members) in enumerate(formed) for u in members}
+    snapshots = {
+        (a, b): mutual
+        for _, a, b, mutual in store._all(
+            "SELECT * FROM alpha_pending_pairs WHERE window_id = ?", wid
+        )
+    }
+    tries = hits = unknown = 0
+    for a, b in combinations(sorted(eligible), 2):
+        if eligible[a].goals[0] != eligible[b].goals[0]:
+            continue
+        if (a, b) not in snapshots:
+            unknown += 1
+        elif snapshots[a, b]:
+            tries += 1
+            hits += a in seats and b in seats and seats[a] == seats[b]
+    with store.db:
+        store.db.execute(
+            "INSERT INTO alpha_reunions VALUES (?, ?, ?, ?, ?)", (wid, now, tries, hits, unknown)
+        )
+        for u in eligible:
+            store.db.execute(
+                "INSERT INTO alpha_rates VALUES (?, ?, 1, ?) "
+                "ON CONFLICT(user_id, week) DO UPDATE SET entries = entries + 1, "
+                "placed = placed + excluded.placed",
+                (u, _week(now), int(u in seats)),
+            )
+
+
+def history_metrics(store, cutoff, start, end):
+    tables = {r[0] for r in store._all("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    metrics, samples = {}, {k: None for k in ("A5", "A6", "A7", "A8")}
+    unknown = 0
+    if "alpha_rates" in tables:
+        counts = store._all(
+            "SELECT SUM(entries), SUM(placed) FROM alpha_rates "
+            "WHERE week >= ? AND week >= ? AND week < ? GROUP BY user_id",
+            cutoff,
+            start,
+            end,
+        )
+        metrics.update(match_rate_metrics(counts))
+        samples["A5"] = sum(n >= 3 for n, _ in counts)
+    if "alpha_newcomers" in tables:
+        players = []
+        for u, joined, first_at, first_session in store._all("SELECT * FROM alpha_newcomers"):
+            if not max(cutoff, start) <= joined < end:
+                continue
+            n = store._one(
+                "SELECT COUNT(*) FROM seed_members m JOIN seeds s ON s.id = m.seed_id "
+                "WHERE m.user_id = ? AND s.ends_at < ?",
+                u,
+                end,
+            )[0]
+            players.append((n, first_session if first_at is not None and first_at < end else None))
+        metrics.update(newcomer_metrics(players, 3))
+        samples["A6"] = metrics["newcomers_eligible"]
+    if "alpha_reunions" in tables:
+        rows = store._all(
+            "SELECT tries, hits, unknown FROM alpha_reunions "
+            "WHERE closed_at >= ? AND closed_at >= ? AND closed_at < ?",
+            cutoff,
+            start,
+            end,
+        )
+        tries, hits, unknown = (sum(r[i] for r in rows) for i in range(3))
+        metrics.update(cosignup_metrics(tries, hits))
+        samples["A7"] = tries
+    return metrics, samples, unknown
+
+
 def _week(t: float) -> float:
     dt = datetime.fromtimestamp(t, UTC)
     return (
@@ -93,8 +171,21 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
         else []
     )
     seeds = [s for s in store.seeds() if s.ends_at >= cutoff and s.formed_at <= now]
+    graduation_table = store._one("SELECT name FROM sqlite_master WHERE name = 'alpha_graduations'")
+    graduation_weeks = (
+        {
+            _week(t)
+            for (t,) in store._all(
+                "SELECT t FROM alpha_graduations WHERE t >= ? AND t <= ?", cutoff, now
+            )
+        }
+        if graduation_table
+        else set()
+    )
     weeks = sorted(
-        {_week(r[1]) for r in rows} | {_week(s.formed_at) for s in seeds if s.formed_at >= cutoff}
+        {_week(r[1]) for r in rows}
+        | {_week(s.formed_at) for s in seeds if s.formed_at >= cutoff}
+        | graduation_weeks
     )
     periods = [
         (datetime.fromtimestamp(t, UTC).date().isoformat(), t, t + 7 * DAY) for t in weeks
@@ -116,6 +207,10 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
             counts["preferred"],
             counts["locked"],
         )
+        history, history_samples, history_unknown = history_metrics(
+            store, cutoff, start, min(end, now + 1)
+        )
+        metrics.update(history)
         # Size is the current opted-in population, not sign-up count or guild membership.
         population = store._one("SELECT COUNT(*) FROM players WHERE removed_at IS NULL")[0]
         metrics["population.M"] = population
@@ -123,12 +218,17 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
             metrics.setdefault(criterion.metric, math.nan)
         criteria = experiments.check(metrics, "async")
         criteria["A2"] = "n/a"  # Ruled batch-at-close, even if an early manual close was used.
-        reasons = {
-            key: "not measurable on live data: " + reason for key, reason in UNMEASURABLE.items()
-        }
+        reasons = {key: reason for key, reason in UNMEASURABLE.items()}
         reasons["A2"] = "Rolling cadence only; Phase 1 batches at close."
         if population < experiments.A8_BAR.min_M:
             reasons["A8"] = f"n/a below M = {experiments.A8_BAR.min_M}. " + reasons["A8"]
+        for key in ("A5", "A6", "A7"):
+            if criteria[key] == "n/a":
+                reasons[key] = "Insufficient recorded history; legacy data is not backfilled."
+        if history_unknown:
+            metrics["cosignup_reunion_share"] = math.nan
+            criteria["A7"] = "n/a"
+            reasons["A7"] = "Legacy co-signups lack snapshots; incomplete denominator."
         for key in ("A1", "A3", "A4"):
             if criteria[key] == "n/a":
                 reasons[key] = "No measured samples; old closes cannot be reconstructed."
@@ -152,18 +252,35 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
                     reunions += by_pair[pair] > 0
                 by_pair[pair] += 1
         # This measures formation/return, not actual hours played or inferred friendship.
+        graduation_table = store._one(
+            "SELECT name FROM sqlite_master WHERE name = 'alpha_graduations'"
+        )
+        graduation = (
+            store._one(
+                "SELECT COUNT(*) FROM alpha_graduations WHERE t >= ? AND t >= ? AND t < ?",
+                cutoff,
+                start,
+                end,
+            )[0]
+            if graduation_table
+            else 0
+        )
         success = {
             "repeat_use": "pass" if repeat else ("FAIL" if seats else "n/a"),
             "reunions": "pass" if reunions else ("FAIL" if seats else "n/a"),
-            "graduation": "n/a",
-            "overall": "FAIL" if seats and (not repeat or not reunions) else "n/a",
-            "graduation_reason": "not measurable on live data: the bot cannot observe a group "
-            "moving to its own server; leaving or inactivity is not graduation.",
+            "graduation": "pass" if graduation else "n/a",
+            "overall": "FAIL"
+            if seats and (not repeat or not reunions)
+            else ("pass" if repeat and reunions and graduation else "n/a"),
+            "graduation_reports": graduation,
+            "graduation_reason": "Voluntary own-group self-reports; no response, inactivity and "
+            "leaving do not establish graduation. Counts are reporters, not distinct groups.",
         }
         out.append(
             {
                 "period": label,
-                "coverage": "retained data; closes measured since slice 5 only",
+                "coverage": "retained data; A5/A7 since follow-up; "
+                "A6 new joiners only; no backfill",
                 **counts,
                 **{k: None if math.isnan(v) else v for k, v in metrics.items()},
                 **criteria,
@@ -177,10 +294,7 @@ def report(store: Store, cfg: BotConfig, now: float) -> list[dict]:
                     "A2": None,
                     "A3": counts["slots"],
                     "A4": counts["entries"],
-                    "A5": None,
-                    "A6": None,
-                    "A7": None,
-                    "A8": None,
+                    **history_samples,
                 },
                 "confidence_intervals": None,
                 "uncertainty_reason": "The simulator supplies replicate standard deviations, "

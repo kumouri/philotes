@@ -40,6 +40,7 @@ HELP = (
     "**report**.\n"
     "`/forget` — clear a mark you set (frees a block slot).\n"
     "`/report` — report someone you played with to this community's moderators.\n"
+    "`/graduated` — optionally report your group moving to its own server or chat.\n"
     "`/mydata` — everything we hold about you. `/leave` — delete it all.\n\n"
     "Seeds form once a week, when the sign-up window closes. You only hear from the bot when "
     "your seed forms and when it ends by DM. YAML reminders and room details stay in the seed "

@@ -96,6 +96,12 @@ COMMANDS: tuple[Command, ...] = (
             Option("reason", STR, "What happened", required=True),
         ),
     ),
+    Command(
+        "graduated",
+        "graduated",
+        "Optionally report your group moving to its own server/chat",
+        (Option("confirm", BOOL, "Yes, report my group's graduation"),),
+    ),
     Command("mydata", "mydata", "Everything Philotes holds about you"),
     Command(
         "leave",

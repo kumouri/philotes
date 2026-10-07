@@ -11,7 +11,8 @@ swiping.
 
 **Status: Phase 1 build complete, pending live deployment.** Phase 0's simulator met its exit
 criteria. The bot includes the local core, Discord adapter, optional Archipelago automation,
-private moderation tools and anonymous alpha reports. It has not connected to Discord or served
+private moderation tools, anonymous alpha reports and voluntary graduation self-reports.
+A5–A7 have live recording; A8 stays unavailable by design to preserve avoid deletion. It has not connected to Discord or served
 users. The host community is undecided; hosting is Ceryce's desktop for now.
 
 - [`docs/spec.md`](docs/spec.md) is the canonical spec. It covers the rulings, prior art, model and
