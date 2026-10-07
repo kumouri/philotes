@@ -4,9 +4,9 @@ Nothing here names a community. The host community is a config value (``[communi
 Ceryce (§14 #3, still open), so the same code runs anywhere. ``philotes-bot.example.toml`` at the
 repo root lists every key; the real ``philotes-bot.toml`` is git-ignored.
 
-Secrets never go in the TOML. ``DISCORD_TOKEN`` is read from the process environment, or else from
+Secrets never go in the TOML. ``DISCORD_TOKEN`` is read only from
 an untracked ``.env`` file. When it is absent the bot still runs on the local in-memory transport;
-nothing in this slice talks to Discord.
+the explicit run command requires a token before connecting to Discord.
 
 The matcher settings are the ruled v1 values, not the Phase 0 simulator's defaults: soft-avoid
 half-life ~7 days (§14 #9), hard-block cap 10 (§14 #8), no newcomer boost and no anchors (§14 #18),
@@ -16,7 +16,6 @@ seeds formed in one batch when the sign-up window closes (§14 #15).
 from __future__ import annotations
 
 import dataclasses
-import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -115,12 +114,11 @@ def _section(cls: type, data: dict[str, Any]) -> Any:
 def load_config(
     path: Path | None = None, env_file: Path | None = None, environ: dict[str, str] | None = None
 ) -> BotConfig:
-    """Read ``path`` (TOML; missing → defaults) and the token from ``environ`` or ``env_file``."""
+    """Read TOML and token only from the env file; environ is ignored for compatibility."""
     data: dict[str, Any] = {}
     if path is not None and path.is_file():
         data = tomllib.loads(path.read_text(encoding="utf-8"))
-    env = dict(os.environ if environ is None else environ)
-    token = env.get(TOKEN_ENV) or read_env_file(env_file or Path(".env")).get(TOKEN_ENV) or None
+    token = read_env_file(env_file or Path(".env")).get(TOKEN_ENV) or None
     cfg = BotConfig(
         community=_section(Community, data.get("community", {})),
         window=_section(Window, data.get("window", {})),

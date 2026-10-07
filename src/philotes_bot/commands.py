@@ -1,7 +1,7 @@
 """The slash-command surface, declared once for every transport.
 
 Each ``Command`` names a ``Bot`` method and its options. The local console parses typed lines with
-it, and the Discord adapter (a later slice) registers the same list as application commands, so
+it, and the Discord adapter registers the same list as application commands, so
 the two cannot drift. Option names are the method's parameter names.
 """
 

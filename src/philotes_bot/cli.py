@@ -5,7 +5,7 @@
 * ``philotes-bot check`` — show the resolved configuration, and whether a Discord token is set
   (never the token itself).
 
-Nothing here connects to Discord. The gateway transport is a later slice (docs/phase1-bot.md).
+Only the explicit run command connects to Discord.
 """
 
 from __future__ import annotations
@@ -31,9 +31,14 @@ def main(argv: list[str] | None = None) -> int:
     con.add_argument("--db", default=":memory:", help="SQLite path (default: in memory)")
     con.add_argument("--seed", type=int, default=0, help="matcher noise seed")
     sub.add_parser("check", help="show the resolved configuration")
+    sub.add_parser("run", help="connect to Discord (host setup required)")
     a = ap.parse_args(argv)
 
     cfg = load_config(a.config, a.env_file)
+    if a.cmd == "run":
+        from .discord_adapter import run
+
+        return run(cfg)
     if a.cmd == "check":
         print(f"config file: {a.config} ({'found' if a.config.is_file() else 'not found'})")
         print(f"community: {cfg.community}")
@@ -41,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"safety: {cfg.safety}")
         print(f"database: {cfg.db_path}")
         print(f"DISCORD_TOKEN: {'set' if cfg.discord_token else 'absent'}")
-        print("transport: in-memory only in this slice (the Discord gateway is slice 2)")
+        print("transports: local in-memory; Discord gateway via run")
         return 0
     if a.cmd == "demo":
         console = Console(cfg, DEMO_START, seed=1)

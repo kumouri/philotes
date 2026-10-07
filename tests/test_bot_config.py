@@ -31,10 +31,10 @@ def test_toml_and_env_file(tmp_path):
     assert "abc.def" not in repr(cfg)  # never printed
 
 
-def test_environment_wins_over_env_file(tmp_path):
+def test_only_env_file_supplies_token(tmp_path):
     (tmp_path / ".env").write_text("DISCORD_TOKEN=file\n", encoding="utf-8")
     cfg = load_config(None, tmp_path / ".env", environ={"DISCORD_TOKEN": "process"})
-    assert cfg.discord_token == "process"
+    assert cfg.discord_token == "file"
 
 
 def test_bad_config_is_refused(tmp_path):

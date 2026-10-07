@@ -6,7 +6,7 @@ that channel, and post into the moderators' channel. Slash-command replies are r
 transport calls.
 
 ``InMemoryTransport`` records every call and is what the tests and the local console use. It never
-touches the network. A Discord gateway transport is a later slice (docs/phase1-bot.md).
+touches the network. The Discord gateway transport is in discord_adapter.py (docs/phase1-bot.md).
 """
 
 from __future__ import annotations
