@@ -648,6 +648,14 @@ that a person avoided them. It must not claim avoids are undetectable. This is t
 honest limit (§7.6), and players should know it before they rely on an avoid. Anyone who needs
 certainty uses a hard block or a report.
 
+**As built so far** (2026-10-06, [`src/philotes_bot/`](../src/philotes_bot/)). Slice 1 of the bot
+is the core: sign-ups, batch-at-close seed forming with matcher v0 (the simulator's code, not a
+copy), the post-seed card, marks, reports, moderator commands and retention. It runs locally on an
+in-memory transport and does not yet connect to Discord. The host community is a config value.
+[phase1-bot.md](phase1-bot.md) records the choices made where this spec is silent and the slices
+still to come. [SETUP.md](SETUP.md) has the host's setup steps, and
+[user-guide.md](user-guide.md) is what players are told, including that avoids are honoured.
+
 ### Phase 2: more communities
 
 Onboard additional servers. Opt-in cross-community pooling (§7.5 step 5). Self-hosting docs, so
