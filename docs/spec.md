@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Phase 0 exit criteria met** under the ruled async shape (batch at window close, 7-day soft-avoid half-life, A8 at the honest limit; §12, §14 #15). Simulator in [`src/philotes_sim/`](../src/philotes_sim/), results in [`phase0-results.md`](phase0-results.md). **Phase 1 is unblocked** (the patent check, §14 #14, is ruled). Its bot core is built and runs locally ([`phase1-bot.md`](phase1-bot.md)); it is not connected to Discord, and there are no users or hosting yet. |
+| **Status** | **Phase 0 exit criteria met** under the ruled async shape (batch at close, 7-day half-life, A8 ≤ 0.60 at M ≥ 100; §12, §14 #15). **Phase 1's build is complete pending live deployment** ([`phase1-bot.md`](phase1-bot.md)): core, Discord adapter, optional Archipelago automation, moderation and anonymous alpha measurement. It has never connected to Discord or served users. The host community is still undecided; hosting is ruled desktop-for-now (§14 #6). |
 | **Spec version** | v0.1, 2026-09-24 (first draft) |
 | **Owner / decider** | Ceryce |
 | **Canonical source** | This file. Other formats are rendered from it. |
@@ -648,13 +648,14 @@ that a person avoided them. It must not claim avoids are undetectable. This is t
 honest limit (§7.6), and players should know it before they rely on an avoid. Anyone who needs
 certainty uses a hard block or a report.
 
-**As built so far** (2026-10-06, [`src/philotes_bot/`](../src/philotes_bot/)). Slice 1 of the bot
-is the core: sign-ups, batch-at-close seed forming with matcher v0 (the simulator's code, not a
-copy), the post-seed card, marks, reports, moderator commands and retention. It runs locally on an
-in-memory transport and does not yet connect to Discord. The host community is a config value.
-[phase1-bot.md](phase1-bot.md) records the choices made where this spec is silent and the slices
-still to come. [SETUP.md](SETUP.md) has the host's setup steps, and
-[user-guide.md](user-guide.md) is what players are told, including that avoids are honoured.
+**As built** (2026-10-07, [`src/philotes_bot/`](../src/philotes_bot/)): all five build slices
+are complete. The bot includes the core, Discord adapter, optional Archipelago automation,
+moderation review and aggregate alpha reports. Measurement preserves §11 retention rather than
+retaining historical individual sign-ups or card labels; unavailable tests are explicitly n/a.
+[phase1-bot.md](phase1-bot.md) records the definitions and choices, including the limitations on
+A5–A8 and graduation. No live deployment or alpha has happened. The host community remains
+undecided; the hosting ruling is Ceryce's desktop for now. [SETUP.md](SETUP.md) has the host's
+steps, and [user-guide.md](user-guide.md) explains the player flow and honoured avoids.
 
 ### Phase 2: more communities
 

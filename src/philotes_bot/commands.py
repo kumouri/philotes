@@ -115,6 +115,7 @@ COMMANDS: tuple[Command, ...] = (
         "Let a removed player sign up again",
         (Option("user", USER, "Who", required=True),),
     ),
+    Command("mod metrics", "mod_metrics", "Anonymous weekly and cumulative alpha measurements"),
     Command("mod reports", "mod_reports", "List open reports"),
     Command(
         "mod resolve",

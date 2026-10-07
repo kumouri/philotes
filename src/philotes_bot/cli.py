@@ -11,6 +11,7 @@ Only the explicit run command connects to Discord.
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,10 +32,36 @@ def main(argv: list[str] | None = None) -> int:
     con.add_argument("--db", default=":memory:", help="SQLite path (default: in memory)")
     con.add_argument("--seed", type=int, default=0, help="matcher noise seed")
     sub.add_parser("check", help="show the resolved configuration")
+    metrics = sub.add_parser("metrics", help="local anonymous alpha report (read-only)")
+    metrics.add_argument("--db", type=Path, help="existing SQLite path (default: configured path)")
+    metrics.add_argument("--out", type=Path, help="aggregate export path ending in .csv or .json")
     sub.add_parser("run", help="connect to Discord (host setup required)")
     a = ap.parse_args(argv)
 
     cfg = load_config(a.config, a.env_file)
+    if a.cmd == "metrics":
+        from .measurement import export, render, report
+        from .store import Store
+
+        path = (a.db or Path(cfg.db_path)).resolve()
+        if not path.is_file():
+            ap.error("metrics requires an existing database")
+        if a.out and a.out.suffix.lower() not in (".csv", ".json"):
+            ap.error("--out must end in .csv or .json")
+        if a.out and a.out.resolve() == path:
+            ap.error("--out cannot overwrite the database")
+        store = Store.__new__(Store)
+        store.db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+        try:
+            store.db.execute("BEGIN")  # consistent snapshot across all report reads
+            rows = report(store, cfg, datetime.now(UTC).timestamp())
+            store.db.rollback()
+            if a.out:
+                export(rows, a.out)
+            print(render(rows))
+        finally:
+            store.close()
+        return 0
     if a.cmd == "run":
         from .discord_adapter import run
 

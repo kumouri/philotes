@@ -705,6 +705,13 @@ class Bot:
             if self.transport.post_mod(Message(evidence)):
                 self.store._exec("INSERT INTO review_notices VALUES (?, ?)", key, now)
 
+    def mod_metrics(self, inv: Invocation) -> Reply:
+        if (r := self._mod(inv)) is not None:
+            return r
+        from .measurement import render, report
+
+        return Reply(render(report(self.store, self.cfg, self.clock())))
+
     def mod_close_window(self, inv: Invocation) -> Reply:
         """Close this week's window now and form seeds (operations and testing)."""
         if (r := self._mod(inv)) is not None:
@@ -741,6 +748,9 @@ class Bot:
     def _close_and_form(self, wid: int, now: float) -> int:
         signups = self.store.signups(wid)
         formed = form_seeds(self.store, self.cfg, signups, now, self.rng)
+        from .measurement import close_counts, save_close
+
+        counts = close_counts(self.store, self.cfg, signups, formed, now)
         w = self.cfg.window
         for goal, members in formed:
             days = w.goal_days[goal]
@@ -768,6 +778,7 @@ class Bot:
                         text.SEED_FORMED_DM.format(seed=sid, goal=name, n=len(members), where=where)
                     ),
                 )
+        save_close(self.store, wid, now, counts)
         self.store.close_window(wid)
         new_wid = self.store.create_window(now, self.next_close(now))
         placed = {m for _, members in formed for m in members}

@@ -16,6 +16,7 @@ import numpy as np
 
 from .config import MINUTES_PER_DAY, MINUTES_PER_HOUR, MINUTES_PER_WEEK
 from .edges import HARD, MORE, SOFT
+from .metric_helpers import placement_metrics, share
 from .sim import Record
 
 HALL_CASUAL_FRIEND_HOURS = 50.0  # §2: Hall (2018)
@@ -126,7 +127,6 @@ def compute(rec: Record) -> dict[str, float]:
         if e.peak
     ]
     m["entries"] = len(organic)
-    m["placed_share"] = _share([w < math.inf for w in waits])
     m["placed_share_peak"] = _share([w < math.inf for w in peak_waits])
     m["wait_median_peak"] = censored_quantile(peak_waits, 0.5)
     m["wait_p90_peak"] = censored_quantile(peak_waits, 0.9)
@@ -154,7 +154,6 @@ def compute(rec: Record) -> dict[str, float]:
         for s in measured_sessions
         for p in s.members
     ]
-    m["pref_size_share"] = _share(pref)  # placed at a preferred size, not a widened one (§7.5)
     m["mean_lobby_size"] = (
         float(np.mean([len(s.members) for s in measured_sessions])) if measured_sessions else 0
     )
@@ -173,7 +172,14 @@ def compute(rec: Record) -> dict[str, float]:
     if not live:
         n_signups = len(organic)
         locked = sum(sum(1 for p in s.hard_locked if p != tpid) for s in samples)
-        m["locked_signup_share"] = locked / n_signups if n_signups else math.nan
+        m.update(
+            placement_metrics(
+                n_signups, sum(w < math.inf for w in waits), len(pref), sum(pref), locked
+            )
+        )
+    else:
+        m["placed_share"] = share(sum(w < math.inf for w in waits), len(waits))
+        m["pref_size_share"] = share(sum(pref), len(pref))
     if target is not None:
         t_ents = [e for e in ents if e.pid == tpid]
         m["target_entries"] = len(t_ents)
@@ -453,4 +459,4 @@ def lockout_by_n(rec: Record) -> list[dict[str, float | str]]:
 
 
 def _share(flags: list[bool]) -> float:
-    return sum(1 for f in flags if f) / len(flags) if flags else math.nan
+    return share(sum(flags), len(flags))

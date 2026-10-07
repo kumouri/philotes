@@ -200,3 +200,18 @@ and posts its room-page link. The upstream 0.6.8 UI contract can change. Site ow
 are not persisted, remote end/deletion is not automated, and site retention applies independently
 of local cleanup or `/leave`. Confirm an acceptable owner/recovery/deletion procedure and tell
 players about this limitation before opting in. Self-host supervision applies only to local rooms.
+
+## Local alpha measurement
+
+The operator can read the existing bot database without starting Discord or AP:
+
+```sh
+uv run philotes-bot metrics --db philotes-bot.sqlite3 --out summary.csv
+uv run philotes-bot metrics --db philotes-bot.sqlite3 --out summary.json
+```
+
+Use the actual configured database path; the command never creates a missing database.
+Moderators can use `/mod metrics` for the same private aggregate report. See
+[phase1-bot.md](phase1-bot.md#slice-5-alpha-measurement) for sample sizes, retention,
+A1–A8 applicability and the success test's limits. Reports do not expose identities or marks,
+and do not establish graduation or a complete alpha pass while tests remain n/a.
