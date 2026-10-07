@@ -44,7 +44,7 @@ class Weights:
 class Policy:
     """Matcher policy: the tunables Ceryce rules on after Phase 0 (§14 #8, #9, §7.4)."""
 
-    hard_cap: int = 5  # hard blocks per player (§7.2, §14 #8); over the cap a block becomes soft
+    hard_cap: int = 10  # hard blocks per player (§7.2, §14 #8); over the cap a block becomes soft
     soft_half_life_days: float = 30.0  # soft-avoid decay (§7.2, §14 #9)
     soft_negligible: float = 0.05  # a soft avoid below this weight is deleted (§11)
     newcomer_decay_sessions: int = 20  # boost reaches 0 after this many sessions; 0 = no boost

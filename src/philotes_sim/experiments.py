@@ -28,6 +28,9 @@ LIVE_WEEKS = 12  # 2 burn-in + 10 measured
 ASYNC_WEEKS = 26  # 4 burn-in + 22 measured sign-up windows
 LONG_WEEKS = 60  # half-life sweeps: a soft avoid expires after ~4.3 half-lives (90 d → 55 wk)
 CLOSE_ONLY = {"shape.cadence_hours": 168.0, "shape.ladder_minutes": "1e9,1e9,1e9"}
+# The Phase 0 sweep ran at the then-lean cap of 5. Pinned so the committed results still reproduce
+# now that the ruled default is 10 (§14 #8); the cap groups override it per arm.
+PHASE0_HARD_CAP = {"policy.hard_cap": 5}
 
 
 @dataclass(frozen=True)
@@ -277,7 +280,7 @@ def scenario_for(group: Group, arm: dict[str, Any], seed: int) -> Scenario:
         if group.shape == "live"
         else async_baseline(weeks=ASYNC_WEEKS)
     )
-    scn = with_overrides(base, {**(group.base or {}), **arm})
+    scn = with_overrides(base, {**PHASE0_HARD_CAP, **(group.base or {}), **arm})
     return with_overrides(scn, {"seed": seed, "name": group.name})
 
 
