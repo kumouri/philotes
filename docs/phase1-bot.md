@@ -115,18 +115,19 @@ Choices where the spec is silent:
   warning. There is no retry queue: failed hand-off DMs are not resent; players use `/status` and
   `/recent`. Existing core delivery/persistence crash windows remain; run one process per database.
 
-### Hosting options for Ceryce (§14 #6 remains her decision)
+### Hosting on her Windows desktop (§14 #6)
 
-Recommendation first; prices checked 2026-10-07, before tax, backups and extra usage.
+Ceryce chose her Windows desktop for now (§14 #6); revisit before a wider alpha.
+Alternative prices checked 2026-10-07, before tax, backups and extra usage.
 These host the gateway bot, not an Archipelago room.
 
 | Option | Cost | Tradeoff |
 |---|---|---|
-| **Recommended: small DigitalOcean VPS** | [From US$4/month](https://www.digitalocean.com/products/droplets); budget US$6/month for 1 GiB | Always-on gateway and local SQLite fit directly; Ceryce maintains OS, service and backups; measure memory before choosing the smallest size. |
+| **Small DigitalOcean VPS** | [From US$4/month](https://www.digitalocean.com/products/droplets); budget US$6/month for 1 GiB | Always-on gateway and local SQLite fit directly; Ceryce maintains OS, service and backups; measure memory before choosing the smallest size. |
 | **Her existing Windows desktop** | US$0 hosting fee, plus electricity | Works now with `uv run philotes-bot run`; sleep, reboots and internet outages pause matching. |
 | **Railway Hobby with persistent volume** | [US$5/month minimum including US$5 usage](https://docs.railway.com/pricing/plans), overage extra | Less OS maintenance; SQLite needs a mounted volume and one replica, and usage can exceed the minimum. |
 
-No provider has been selected or provisioned. Ceryce tries this on a private test server first;
+Ceryce tries this on her Windows desktop on a private test server first;
 [SETUP.md](SETUP.md) contains her steps. Offline tests cover adapter events without logging in.
 
 ## Slices still to come

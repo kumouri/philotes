@@ -107,6 +107,6 @@ server. `philotes-bot check` confirms local configuration without connecting.
     `[window] goal_days` in that test configuration, keeping one value per goal. Restore defaults
     before the host community trial. Do not shorten retention in a community database.
 18. Use one bot process per database. Keep `.env` and the database private, and back up the database
-    while the bot is stopped. Review [hosting options](phase1-bot.md#hosting-options-for-ceryce-14-6-remains-her-decision)
-    before choosing an always-on host; §14 #6 remains Ceryce's decision. No application, invite,
+    while the bot is stopped. The bot runs on [her Windows desktop](phase1-bot.md#hosting-on-her-windows-desktop-14-6)
+    for now (§14 #6); revisit hosting before a wider alpha. No application, invite,
     token or hosted service was created during implementation.
