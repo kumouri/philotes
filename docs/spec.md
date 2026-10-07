@@ -616,7 +616,10 @@ accept the honest limit.** A8's adopted bar is **detection AUC ≤ 0.60 at M ≥
 7-day half-life**. That is the measured 0.586 plus 0.014 of headroom, about 1.4 times the
 standard deviation across replicate seeds (0.010). The bar starts at M = 100 because M = 50
 measured 0.600, right on the line with no headroom. Bigger pools lower the AUC, so 0.60 should
-hold above M = 100, but the 7-day half-life was only run at M = 50 and 100. In those 7-day runs
+hold above M = 100, but the 7-day half-life was only run at M = 50 and 100. The simulator reads
+the bar from one constant, `A8_BAR` in [`experiments.py`](../src/philotes_sim/experiments.py). Its
+A8 check judges every arm with M ≥ 100 against it, leaves smaller communities n/a, and a fresh
+sweep report names the bar it applied. In the 7-day runs
 at M = 100, A1 and A3–A8 all pass (97% placed, 98% at a preferred size, 0.2% locked, bottom
 decile 89% of median, 56% of newcomers within 3 seeds, 55% co-signup reunion, AUC 0.586).
 **Phase 0's exit criteria are met** under the ruled async shape from M = 100 up. Suggested
